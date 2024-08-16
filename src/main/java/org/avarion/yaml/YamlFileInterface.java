@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public abstract class YamlFileInterface {
 	static final Object UNKNOWN = new Object();
 	private static final Yaml yaml;
-	private final static Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
+	private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
 	static {
 		DumperOptions options = new org.yaml.snakeyaml.DumperOptions();
