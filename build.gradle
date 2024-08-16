@@ -12,6 +12,7 @@ java {
 
 tasks.withType(JavaCompile).configureEach { // both compileJave & compileTestJava
     options.compilerArgs += ["-Xlint:deprecation", "-Xlint:-options"]
+    options.encoding = 'UTF-8'
 }
 
 repositories {
@@ -59,6 +60,7 @@ sonar {
     properties {
         property "sonar.projectKey", "yaml"
         property "sonar.organization", "AvarionMC"
+        property "sonar.host.url", "https://sonarcloud.io"
     }
 }
 
