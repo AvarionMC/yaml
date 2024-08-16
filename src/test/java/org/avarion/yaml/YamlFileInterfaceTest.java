@@ -319,6 +319,11 @@ public class YamlFileInterfaceTest {
 		(new BlankHeader()).save(target.toString());
 
 		assertEquals("key: 1", new String(Files.readAllBytes(target.toPath())).trim());
+
+		IOException thrown = assertThrows(IOException.class, () -> {
+			(new FinalKeyword()).load(target);
+		});
+		assertTrue(thrown.getMessage().contains("'key' is final"));
 	}
 
 
