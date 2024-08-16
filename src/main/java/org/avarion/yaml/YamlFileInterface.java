@@ -13,8 +13,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -26,6 +25,7 @@ import java.util.stream.Collectors;
 public abstract class YamlFileInterface {
 	static final Object UNKNOWN = new Object();
 	private static final Yaml yaml;
+	private final static Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
 	static {
 		DumperOptions options = new org.yaml.snakeyaml.DumperOptions();
@@ -35,7 +35,9 @@ public abstract class YamlFileInterface {
 		yaml = new Yaml(options);
 	}
 
-	private static @Nullable Object getConvertedValue(@NotNull Field field, Object value) throws IOException {
+	private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value)
+			throws IOException
+	{
 		Class<?> expectedType = field.getType();
 
 		if (value == null) {
@@ -66,13 +68,14 @@ public abstract class YamlFileInterface {
 			return convertToCharacter((String) value);
 		}
 
-		throw new IOException("Cannot convert "
-							  + value.getClass().getSimpleName()
-							  + " to "
+		throw new IOException("What else could be going on here? type: "
+							  + value.getClass().getSimpleName() + " -> "
 							  + expectedType.getSimpleName());
 	}
 
-	private static @Nullable Object handleNullValue(@NotNull Class<?> expectedType, Field field) throws IOException {
+	private static @Nullable Object handleNullValue(final @NotNull Class<?> expectedType, final Field field)
+			throws IOException
+	{
 		if (expectedType.isPrimitive()) {
 			throw new IOException("Cannot assign null to primitive type "
 								  + expectedType.getSimpleName()
@@ -83,7 +86,7 @@ public abstract class YamlFileInterface {
 		return null;
 	}
 
-	private static Object handleListValue(@NotNull Field field, List<?> list) {
+	private static Object handleListValue(final @NotNull Field field, final List<?> list) throws IOException {
 		Type genericType = field.getGenericType();
 		if (genericType instanceof ParameterizedType) {
 			Class<?> elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
@@ -93,23 +96,24 @@ public abstract class YamlFileInterface {
 						   .collect(Collectors.toList());
 			}
 		}
-		return list;
+
+		throw new IOException("List received without a parametrized type??");
 	}
 
-	private static boolean isBooleanType(Class<?> type) {
+	private static boolean isBooleanType(final Class<?> type) {
 		return type == boolean.class || type == Boolean.class;
 	}
 
-	private static @NotNull Boolean convertToBoolean(Object value) {
+	private static @NotNull Boolean convertToBoolean(final Object value) {
 		if (value instanceof Boolean) {
 			return (Boolean) value;
 		}
 
-		String strValue = value.toString().toLowerCase().trim();
-		return strValue.equals("true") || strValue.equals("yes") || strValue.equals("y") || strValue.equals("1");
+		final String strValue = value.toString().toLowerCase().trim();
+		return TRUE_VALUES.contains(strValue);
 	}
 
-	private static Object convertNumber(Number numValue, Class<?> expectedType) throws IOException {
+	private static Object convertNumber(final Number numValue, final Class<?> expectedType) throws IOException {
 		if (expectedType == int.class || expectedType == Integer.class) {
 			return numValue.intValue();
 		}
@@ -134,7 +138,7 @@ public abstract class YamlFileInterface {
 							  + expectedType.getSimpleName());
 	}
 
-	private static float convertToFloat(@NotNull Number numValue) throws IOException {
+	private static float convertToFloat(final @NotNull Number numValue) throws IOException {
 		double doubleValue = numValue.doubleValue();
 		if (Math.abs(doubleValue - (float) doubleValue) >= 1e-9) {
 			throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
@@ -142,7 +146,7 @@ public abstract class YamlFileInterface {
 		return numValue.floatValue();
 	}
 
-	private static boolean isCharacterType(Class<?> type) {
+	private static boolean isCharacterType(final Class<?> type) {
 		return type == char.class || type == Character.class;
 	}
 
@@ -154,7 +158,7 @@ public abstract class YamlFileInterface {
 		throw new IOException("Cannot convert String of length " + value.length() + " to Character");
 	}
 
-	private static <E extends Enum<E>> @NotNull E stringToEnum(Class<E> enumClass, @NotNull String value) {
+	private static <E extends Enum<E>> @NotNull E stringToEnum(final Class<E> enumClass, final @NotNull String value) {
 		return Enum.valueOf(enumClass, value.toUpperCase());
 	}
 
@@ -167,11 +171,11 @@ public abstract class YamlFileInterface {
 	 * @throws IOException If there's an error reading the file or parsing the YAML content.
 	 *
 	 *                     <pre>{@code
-	 *                                         MyConfig config = new MyConfig();
-	 *                                         config.load(new File("config.yml"));
-	 *                                         }</pre>
+	 *                                                             MyConfig config = new MyConfig();
+	 *                                                             config.load(new File("config.yml"));
+	 *                                                             }</pre>
 	 */
-	public <T extends YamlFileInterface> T load(@NotNull File file) throws IOException {
+	public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
 		if (!file.exists()) {
 			save(file);
 			return (T) this;
@@ -193,7 +197,7 @@ public abstract class YamlFileInterface {
 		return (T) this;
 	}
 
-	private void loadFields(@NotNull Object obj, Map<String, Object> data)
+	private void loadFields(final @NotNull Object obj, final Map<String, Object> data)
 			throws FinalAttribute, IllegalAccessException, IOException
 	{
 		for (Class<?> clazz = obj.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
@@ -230,11 +234,11 @@ public abstract class YamlFileInterface {
 	 * config.load("config.yml");
 	 * }</pre>
 	 */
-	public <T extends YamlFileInterface> T load(@NotNull String file) throws IOException {
+	public <T extends YamlFileInterface> T load(final @NotNull String file) throws IOException {
 		return load(new File(file));
 	}
 
-	private static Object getNestedValue(Map<String, Object> map, @NotNull String key) {
+	private static Object getNestedValue(final Map<String, Object> map, final @NotNull String key) {
 		String[] keys = key.split("\\.");
 
 		Object current = map;
@@ -338,7 +342,7 @@ public abstract class YamlFileInterface {
 		}
 	}
 
-	private @NotNull String formatValue(Object value) {
+	private @NotNull String formatValue(final Object value) {
 		StringWriter writer = new StringWriter();
 		yaml.dump(value, writer);
 		String yamlContent = writer.toString().trim();
@@ -359,15 +363,15 @@ public abstract class YamlFileInterface {
 	 * @throws IOException If there's an error writing to the file.
 	 *
 	 *                     <pre>{@code
-	 *                     MyConfig config = new MyConfig();
-	 *                     config.save(new File("config.yml"));
-	 *                     }</pre>
+	 *                                         MyConfig config = new MyConfig();
+	 *                                         config.save(new File("config.yml"));
+	 *                                         }</pre>
 	 */
-	public void save(@NotNull File file) throws IOException {
-		file = file.getAbsoluteFile();
-		file.getParentFile().mkdirs();
+	public void save(final @NotNull File file) throws IOException {
+		final File newFile = file.getAbsoluteFile();
+		newFile.getParentFile().mkdirs();
 
-		try (FileWriter writer = new FileWriter(file)) {
+		try (FileWriter writer = new FileWriter(newFile)) {
 			writer.write(buildYamlContents());
 		}
 		catch (IllegalAccessException | YamlException e) {
