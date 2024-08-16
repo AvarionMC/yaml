@@ -31,7 +31,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@BeforeEach
-	public void setUp() {
+	void setUp() {
 		try {
 			target = File.createTempFile("yaml", ".yaml");
 			target.deleteOnExit();
@@ -43,7 +43,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testSaveAndLoad() throws IOException {
+	void testSaveAndLoad() throws IOException {
 		HappyFlow yamlFile = new HappyFlow();
 
 		assertEquals("New York", yamlFile.city);
@@ -73,7 +73,7 @@ public class YamlFileInterfaceTest {
 
 	// Add more test cases as needed for other methods in YamlFileInterface
 	@Test
-	public void testSaveAndLoad2() throws IOException {
+	void testSaveAndLoad2() throws IOException {
 		NullOrEmptyKey yamlFile = new NullOrEmptyKey();
 		yamlFile.name1 = "1";
 		yamlFile.name2 = "2";
@@ -95,7 +95,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testEnumerations() throws IOException {
+	void testEnumerations() throws IOException {
 		final List<Material> def = Arrays.asList(Material.A, Material.B);
 
 		ListMaterial yamlFile = new ListMaterial();
@@ -113,7 +113,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testEnumerationsInvalidEnumItem() throws IOException {
+	void testEnumerationsInvalidEnumItem() throws IOException {
 		(new ListMaterial()).save(target);
 		replaceInTarget(target, "- 'B'", "- 'D'");
 
@@ -124,7 +124,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testEnumerationsInvalidEnumItem2() throws IOException {
+	void testEnumerationsInvalidEnumItem2() throws IOException {
 		(new ListMaterial()).save(target);
 		replaceInTarget(target, "'C'", "2");
 
@@ -135,7 +135,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testPrimitives() throws IOException {
+	void testPrimitives() throws IOException {
 		Primitive yamlFile = new Primitive();
 		assertFalse(target.exists());
 		assertEquals(1, yamlFile.bt);
@@ -162,7 +162,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testNonPrimitives() throws IOException {
+	void testNonPrimitives() throws IOException {
 		NonPrimitive yamlFile = new NonPrimitive();
 		assertFalse(target.exists());
 		assertEquals((byte)1, yamlFile.bt);
@@ -193,7 +193,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testNullOnPrimitive() throws IOException {
+	void testNullOnPrimitive() throws IOException {
 		(new Primitive()).save(target);
 		replaceInTarget(target, "1", "null");
 
@@ -204,7 +204,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testNullOnNonPrimitive() throws IOException {
+	void testNullOnNonPrimitive() throws IOException {
 		(new NonPrimitive()).save(target);
 
 		replaceInTarget(target, ": a", ": null");
@@ -225,7 +225,7 @@ public class YamlFileInterfaceTest {
 
 	@ParameterizedTest
 	@ValueSource(strings = {"\"true\"", "yes", "y", "\"1\"", "YES", "TrUe", "  yEs  "})
-	public void testDifferentBooleanValues(final String val) throws IOException {
+	void testDifferentBooleanValues(final String val) throws IOException {
 		(new Primitive()).save(target);
 
 		replaceInTarget(target, "true", val);
@@ -236,15 +236,15 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testDoubleKeyUsage() {
-		RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
+	void testDoubleKeyUsage() {
+		IOException thrown = assertThrows(IOException.class, () -> {
 			(new DoubleKeyUsage()).save(target);
 		});
 		assertTrue(thrown.getMessage().contains("'key1' is already used before"));
 	}
 
 	@Test
-	public void testIntAsDoubleValue() throws IOException {
+	void testIntAsDoubleValue() throws IOException {
 		(new NonPrimitive()).save(target);
 		replaceInTarget(target, "1.0", "2");
 
@@ -254,7 +254,7 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
-	public void testWrongChar() throws IOException {
+	void testWrongChar() throws IOException {
 		(new NonPrimitive()).save(target);
 		replaceInTarget(target, ": a", ": 2"); // Now it's an integer
 
@@ -266,7 +266,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testWrongChar2() throws IOException {
+	void testWrongChar2() throws IOException {
 		(new NonPrimitive()).save(target);
 		replaceInTarget(target, ": a", ": abc"); // Now it's a string
 
@@ -278,7 +278,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testCreateConfigOnLoad() throws IOException {
+	void testCreateConfigOnLoad() throws IOException {
 		assertFalse(target.exists());
 		Primitive loaded = new Primitive().load(target);
 		assertNotNull(loaded);
@@ -287,7 +287,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testFinalKeywordOnLoad() throws IOException {
+	void testFinalKeywordOnLoad() throws IOException {
 		(new BlankHeader()).save(target.toString()); // First save a good one
 
 		IOException thrown = assertThrows(IOException.class, () -> {
@@ -298,7 +298,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testFinalKeywordOnSave() {
+	void testFinalKeywordOnSave() {
 		IOException thrown = assertThrows(IOException.class, () -> {
 			(new FinalKeyword()).save(target.toString());
 		});
@@ -307,7 +307,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testBlankHeader() throws IOException {
+	void testBlankHeader() throws IOException {
 		(new BlankHeader()).save(target.toString());
 
 		assertEquals("key: 1", new String(Files.readAllBytes(target.toPath())).trim());
@@ -315,7 +315,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testSaveAsNormalLoadAsFinal() throws IOException {
+	void testSaveAsNormalLoadAsFinal() throws IOException {
 		(new BlankHeader()).save(target.toString());
 
 		assertEquals("key: 1", new String(Files.readAllBytes(target.toPath())).trim());
@@ -323,7 +323,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testFloatNotDouble() throws IOException {
+	void testFloatNotDouble() throws IOException {
 		(new Primitive()).save(target.toString());
 
 		replaceInTarget(target, ": 1.0", ": 1.234567890123");
@@ -337,7 +337,7 @@ public class YamlFileInterfaceTest {
 
 
 	@Test
-	public void testYamlContainsMoreFields() throws IOException {
+	void testYamlContainsMoreFields() throws IOException {
 		HappyFlow file = new HappyFlow();
 		file.streetNumber = 456;
 		assertEquals(456, file.streetNumber);

@@ -1,5 +1,8 @@
 package org.avarion.yaml;
 
+import org.avarion.yaml.exceptions.DuplicateKey;
+import org.avarion.yaml.exceptions.FinalAttribute;
+import org.avarion.yaml.exceptions.YamlException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.yaml.snakeyaml.DumperOptions;
@@ -132,9 +135,9 @@ public abstract class YamlFileInterface {
 	 * @throws IOException If there's an error reading the file or parsing the YAML content.
 	 *
 	 *                     <pre>{@code
-	 *                     MyConfig config = new MyConfig();
-	 *                     config.load(new File("config.yml"));
-	 *                     }</pre>
+	 *                                         MyConfig config = new MyConfig();
+	 *                                         config.load(new File("config.yml"));
+	 *                                         }</pre>
 	 */
 	public <T extends YamlFileInterface> T load(@NotNull File file) throws IOException {
 		if (!file.exists()) {
@@ -142,18 +145,25 @@ public abstract class YamlFileInterface {
 			return (T) this;
 		}
 
-		Yaml yaml = new Yaml();
+		Yaml yml = new Yaml();
 		Map<String, Object> data;
 
 		try (FileInputStream inputStream = new FileInputStream(file)) {
-			data = (Map<String, Object>) yaml.load(inputStream);
+			data = (Map<String, Object>) yml.load(inputStream);
 		}
 
-		loadFields(this, data);
+		try {
+			loadFields(this, data);
+		}
+		catch (IllegalAccessException | IllegalArgumentException | NullPointerException | FinalAttribute e) {
+			throw new IOException(e);
+		}
 		return (T) this;
 	}
 
-	private void loadFields(@NotNull Object obj, Map<String, Object> data) throws IOException {
+	private void loadFields(@NotNull Object obj, Map<String, Object> data)
+			throws FinalAttribute, IllegalAccessException, IOException
+	{
 		for (Class<?> clazz = obj.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
 			for (Field field : clazz.getDeclaredFields()) {
 				YamlKey annotation = field.getAnnotation(YamlKey.class);
@@ -162,7 +172,7 @@ public abstract class YamlFileInterface {
 				}
 
 				if (Modifier.isFinal(field.getModifiers())) {
-					throw new IOException("'" + field.getName() + "' is final. Please adjust this!");
+					throw new FinalAttribute(field.getName());
 				}
 
 				String key = annotation.value();
@@ -172,12 +182,7 @@ public abstract class YamlFileInterface {
 				}
 
 				field.setAccessible(true);
-				try {
-					field.set(obj, getConvertedValue(field, value));
-				}
-				catch (IllegalAccessException | IllegalArgumentException | NullPointerException e) {
-					throw new IOException(e);
-				}
+				field.set(obj, getConvertedValue(field, value));
 			}
 		}
 	}
@@ -186,7 +191,7 @@ public abstract class YamlFileInterface {
 	 * Loads the YAML content from the specified file path into this object.
 	 *
 	 * @param file The path to the YAML file as a String.
-	 * @param <T> The type of YamlFileInterface implementation.
+	 * @param <T>  The type of YamlFileInterface implementation.
 	 * @return The current object instance after loading the YAML content.
 	 * @throws IOException If there's an error reading the file or parsing the YAML content.
 	 * @see #load(File)
@@ -215,7 +220,7 @@ public abstract class YamlFileInterface {
 		return current;
 	}
 
-	private @NotNull String buildYamlContents() throws IllegalAccessException {
+	private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey {
 		NestedMap nestedMap = new NestedMap();
 
 		Class<?> clazz = this.getClass();
@@ -238,7 +243,7 @@ public abstract class YamlFileInterface {
 			}
 
 			if (Modifier.isFinal(field.getModifiers())) {
-				throw new IllegalAccessException("'" + field.getName() + "' is final. Please adjust this!");
+				throw new FinalAttribute(field.getName());
 			}
 
 			Object value = field.get(this);
@@ -326,10 +331,10 @@ public abstract class YamlFileInterface {
 	 * @param file The File object representing the YAML file to save to.
 	 * @throws IOException If there's an error writing to the file.
 	 *
-	 * <pre>{@code
-	 * MyConfig config = new MyConfig();
-	 * config.save(new File("config.yml"));
-	 * }</pre>
+	 *                     <pre>{@code
+	 *                     MyConfig config = new MyConfig();
+	 *                     config.save(new File("config.yml"));
+	 *                     }</pre>
 	 */
 	public void save(@NotNull File file) throws IOException {
 		file = file.getAbsoluteFile();
@@ -338,7 +343,7 @@ public abstract class YamlFileInterface {
 		try (FileWriter writer = new FileWriter(file)) {
 			writer.write(buildYamlContents());
 		}
-		catch (IllegalAccessException e) {
+		catch (IllegalAccessException | YamlException e) {
 			throw new IOException(e.getMessage());
 		}
 	}
