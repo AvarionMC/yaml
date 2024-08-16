@@ -1,6 +1,8 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
+    id "jacoco"
+    id "org.sonarqube" version "5.1.0.4882"
 }
 
 java {
@@ -10,6 +12,7 @@ java {
 
 tasks.withType(JavaCompile).configureEach { // both compileJave & compileTestJava
     options.compilerArgs += ["-Xlint:deprecation", "-Xlint:-options"]
+    options.encoding = 'UTF-8'
 }
 
 repositories {
@@ -17,14 +20,14 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2'
+    compileOnly 'org.yaml:snakeyaml:1.14'
     compileOnly 'org.jetbrains:annotations:24.1.0'
 
+    testRuntimeOnly 'org.yaml:snakeyaml:1.14'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
-
-    testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 test {
@@ -50,5 +53,25 @@ publishing {
     }
     repositories {
         mavenLocal()
+    }
+}
+
+sonar {
+    properties {
+        property "sonar.projectKey", "AvarionMC_yaml"
+        property "sonar.organization", "avarionmc"
+        property "sonar.host.url", "https://sonarcloud.io"
+    }
+}
+
+
+test {
+    finalizedBy jacocoTestReport // report is always generated after tests run
+}
+jacocoTestReport {
+    dependsOn test // tests are required to run before generating the report
+
+    reports {
+        xml.required = true
     }
 }

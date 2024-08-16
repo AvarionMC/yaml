@@ -1,23 +1,39 @@
 package org.avarion.yaml;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import org.avarion.yaml.exceptions.DuplicateKey;
+import org.avarion.yaml.exceptions.FinalAttribute;
+import org.avarion.yaml.exceptions.YamlException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.lang.reflect.*;
+import java.io.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 
-@SuppressWarnings("unchecked")
+/**
+ * Abstract class providing utility methods to handle YAML files, including
+ * serialization and deserialization of Java objects.
+ */
+@SuppressWarnings({"unchecked", "unused"})
 public abstract class YamlFileInterface {
 	static final Object UNKNOWN = new Object();
-	static final YAMLMapper mapper = new YAMLMapper();
+	private static final Yaml yaml;
+
+	static {
+		DumperOptions options = new org.yaml.snakeyaml.DumperOptions();
+		options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+		options.setPrettyFlow(true);
+
+		yaml = new Yaml(options);
+	}
 
 	private static @Nullable Object getConvertedValue(@NotNull Field field, Object value) throws IOException {
 		Class<?> expectedType = field.getType();
@@ -106,66 +122,86 @@ public abstract class YamlFileInterface {
 							  + expectedType.getSimpleName());
 	}
 
-	private static <E extends Enum<E>> @NotNull E stringToEnum(Class<E> enumClass, @NotNull String value)
-			throws IllegalArgumentException
-	{
+	private static <E extends Enum<E>> @NotNull E stringToEnum(Class<E> enumClass, @NotNull String value) {
 		return Enum.valueOf(enumClass, value.toUpperCase());
 	}
 
-	@SuppressWarnings("unused")
-	public static <T extends YamlFileInterface> @NotNull T load(@NotNull File target, @NotNull Class<T> clazz)
-			throws IOException
-	{
-		T instance;
+	/**
+	 * Loads the YAML content from the specified file into this object.
+	 * If the file doesn't exist, it creates a new file with the current object's content.
+	 *
+	 * @param file The File object representing the YAML file to load.
+	 * @return The current object instance after loading the YAML content.
+	 * @throws IOException If there's an error reading the file or parsing the YAML content.
+	 *
+	 *                     <pre>{@code
+	 *                                         MyConfig config = new MyConfig();
+	 *                                         config.load(new File("config.yml"));
+	 *                                         }</pre>
+	 */
+	public <T extends YamlFileInterface> T load(@NotNull File file) throws IOException {
+		if (!file.exists()) {
+			save(file);
+			return (T) this;
+		}
+
+		Yaml yml = new Yaml();
+		Map<String, Object> data;
+
+		try (FileInputStream inputStream = new FileInputStream(file)) {
+			data = (Map<String, Object>) yml.load(inputStream);
+		}
+
 		try {
-			instance = clazz.getDeclaredConstructor().newInstance();
+			loadFields(this, data);
 		}
-		catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-			throw new IOException(e.getMessage());
+		catch (IllegalAccessException | IllegalArgumentException | NullPointerException | FinalAttribute e) {
+			throw new IOException(e);
 		}
-
-		target = target.getAbsoluteFile();
-		if (!target.exists()) {
-			instance.save(target);
-			return instance;
-		}
-
-		YAMLMapper mapper = new YAMLMapper();
-		Map<String, Object> obj = mapper.readValue(target, Map.class);
-
-		for (Field field : clazz.getDeclaredFields()) {
-			YamlKey key = field.getAnnotation(YamlKey.class);
-			if (key == null || key.value().trim().isEmpty()) {
-				continue;
-			}
-
-			if (Modifier.isFinal(field.getModifiers())) {
-				throw new IOException("Attribute '" + field.getName() + "' is final. We can't change its value!");
-			}
-
-			field.setAccessible(true);
-			Object value = getNestedValue(obj, key.value());
-			if (value == UNKNOWN) {
-				continue;
-			}
-
-			try {
-				field.set(instance, getConvertedValue(field, value));
-			}
-			catch (IllegalAccessException e) {
-				throw new IOException(e.getMessage());
-			}
-		}
-
-		instance.save(target);
-		return instance;
+		return (T) this;
 	}
 
-	@SuppressWarnings("unused")
-	public static <T extends YamlFileInterface> @NotNull T load(@NotNull String target, @NotNull Class<T> clazz)
-			throws IOException
+	private void loadFields(@NotNull Object obj, Map<String, Object> data)
+			throws FinalAttribute, IllegalAccessException, IOException
 	{
-		return load(new File(target), clazz);
+		for (Class<?> clazz = obj.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
+			for (Field field : clazz.getDeclaredFields()) {
+				YamlKey annotation = field.getAnnotation(YamlKey.class);
+				if (annotation == null || annotation.value().trim().isEmpty()) {
+					continue;
+				}
+
+				if (Modifier.isFinal(field.getModifiers())) {
+					throw new FinalAttribute(field.getName());
+				}
+
+				String key = annotation.value();
+				Object value = getNestedValue(data, key);
+				if (value == UNKNOWN) {
+					continue;
+				}
+
+				field.set(obj, getConvertedValue(field, value));
+			}
+		}
+	}
+
+	/**
+	 * Loads the YAML content from the specified file path into this object.
+	 *
+	 * @param file The path to the YAML file as a String.
+	 * @param <T>  The type of YamlFileInterface implementation.
+	 * @return The current object instance after loading the YAML content.
+	 * @throws IOException If there's an error reading the file or parsing the YAML content.
+	 * @see #load(File)
+	 *
+	 * <pre>{@code
+	 * MyConfig config = new MyConfig();
+	 * config.load("config.yml");
+	 * }</pre>
+	 */
+	public <T extends YamlFileInterface> T load(@NotNull String file) throws IOException {
+		return load(new File(file));
 	}
 
 	private static Object getNestedValue(Map<String, Object> map, @NotNull String key) {
@@ -183,7 +219,7 @@ public abstract class YamlFileInterface {
 		return current;
 	}
 
-	private @NotNull String buildYamlContents() throws IllegalAccessException {
+	private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey {
 		NestedMap nestedMap = new NestedMap();
 
 		Class<?> clazz = this.getClass();
@@ -192,25 +228,19 @@ public abstract class YamlFileInterface {
 		StringBuilder result = new StringBuilder();
 		YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
 		if (yamlFileAnnotation != null && !yamlFileAnnotation.header().trim().isEmpty()) {
-			for (String line : yamlFileAnnotation.header().split("\\r?\\n")) {
-				result.append("# ").append(line.replace("\\s*$", "")).append("\n");
-			}
+			splitAndAppend(result, yamlFileAnnotation.header(), "", "# ");
 			result.append("\n");  // Empty line after the header
 		}
 
 		// 2. fields
 		for (Field field : clazz.getDeclaredFields()) {
-			field.setAccessible(true);
-
 			YamlKey key = field.getAnnotation(YamlKey.class);
 			if (key == null || key.value().trim().isEmpty()) {
 				continue;
 			}
 
 			if (Modifier.isFinal(field.getModifiers())) {
-				throw new IllegalAccessException("Attribute '"
-												 + field.getName()
-												 + "' is final. We can't change its value!");
+				throw new FinalAttribute(field.getName());
 			}
 
 			Object value = field.get(this);
@@ -239,11 +269,12 @@ public abstract class YamlFileInterface {
 		}
 	}
 
-	private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<String, Object> map, int indent)
-			throws IllegalAccessException
+	private void convertNestedMapToYaml(final StringBuilder yaml,
+										final @NotNull Map<String, Object> map,
+										final int indent)
 	{
 		StringBuilder tmp = new StringBuilder();
-		while (indent-- > 0) {
+		for (int i = 0; i < indent; i++) {
 			tmp.append("  ");
 		}
 		final String indentStr = tmp.toString();
@@ -266,42 +297,67 @@ public abstract class YamlFileInterface {
 			}
 			else if (value instanceof List) {
 				yaml.append("\n");
-				splitAndAppend(yaml, formatValue(value), indentStr + "  ", "");
+				for (Object item : (List<?>) value) {
+					splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+				}
 			}
 			else {
-				yaml.append(" ").append(formatValue(value)).append("\n");
+				yaml.append(' ').append(formatValue(value)).append('\n');
 			}
+
 		}
 	}
 
-	private @NotNull String formatValue(Object value) throws IllegalAccessException {
-		try {
-			String yamlContent = mapper.writeValueAsString(value);
-			if (yamlContent.startsWith("---")) {
-				yamlContent = yamlContent.substring(3).trim();
-			}
-			return yamlContent;
+	private @NotNull String formatValue(Object value) {
+		StringWriter writer = new StringWriter();
+		yaml.dump(value, writer);
+		String yamlContent = writer.toString().trim();
+
+		if (value instanceof Enum) {
+			// !!org.avarion.yaml.Material 'A' --> 'A'
+			assert yamlContent.startsWith("!!");
+			yamlContent = yamlContent.replaceAll("^!!\\S+\\s+", "");
 		}
-		catch (JsonProcessingException e) {
-			throw new IllegalAccessException("Failed to serialize to YAML: " + e.getMessage());
-		}
+
+		return yamlContent;
 	}
 
-	@SuppressWarnings("unused")
-	public void save(@NotNull File target) throws IOException {
-		target = target.getAbsoluteFile();
-		target.getParentFile().mkdirs();
+	/**
+	 * Saves the current object's content to the specified file in YAML format.
+	 *
+	 * @param file The File object representing the YAML file to save to.
+	 * @throws IOException If there's an error writing to the file.
+	 *
+	 *                     <pre>{@code
+	 *                     MyConfig config = new MyConfig();
+	 *                     config.save(new File("config.yml"));
+	 *                     }</pre>
+	 */
+	public void save(@NotNull File file) throws IOException {
+		file = file.getAbsoluteFile();
+		file.getParentFile().mkdirs();
 
-		try (FileWriter writer = new FileWriter(target)) {
+		try (FileWriter writer = new FileWriter(file)) {
 			writer.write(buildYamlContents());
 		}
-		catch (IllegalAccessException e) {
+		catch (IllegalAccessException | YamlException e) {
 			throw new IOException(e.getMessage());
 		}
 	}
 
-	@SuppressWarnings("unused")
-	public void save(@NotNull String target) throws IOException {
+	/**
+	 * Saves the current object's content to the specified file path in YAML format.
+	 *
+	 * @param target The path to the YAML file as a String.
+	 * @throws IOException If there's an error writing to the file.
+	 * @see #save(File)
+	 *
+	 * <pre>{@code
+	 * MyConfig config = new MyConfig();
+	 * config.save("config.yml");
+	 * }</pre>
+	 */
+	public void save(@NotNull final String target) throws IOException {
 		save(new File(target));
 	}
 }

@@ -55,9 +55,7 @@ public class Settings extends YamlFileInterface {
 ### You load it like:
 
 ```java
-settings =YamlFileInterface.
-
-load(new File("config.yml"),Settings.class);
+Settings settings = new Settings().load("config.yml");
 ```
 
 ### This will result in this kind of yaml file:
@@ -93,15 +91,4 @@ sub:
 
 ## Import
 
-[Follow the instructions here](https://jitpack.io/#svaningelgem/yaml)
-
-## Minecraft specific instructions
-
-In your `plugin.yml`, you'll need to add this:
-
-```yaml
-libraries:
-  - com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2
-```
-
-This will allow spigot/paper to download the dependencies, keeping your own plugin small.
+[Follow the instructions here](https://jitpack.io/#AvarionMC/yaml)
