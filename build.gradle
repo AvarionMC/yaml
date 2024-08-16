@@ -55,6 +55,14 @@ publishing {
     }
 }
 
+sonar {
+    properties {
+        property "sonar.projectKey", "yaml"
+        property "sonar.organization", "AvarionMC"
+    }
+}
+
+
 test {
     finalizedBy jacocoTestReport // report is always generated after tests run
 }
