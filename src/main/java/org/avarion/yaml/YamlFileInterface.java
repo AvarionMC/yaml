@@ -209,11 +209,9 @@ public abstract class YamlFileInterface {
 
 				String key = annotation.value();
 				Object value = getNestedValue(data, key);
-				if (value == UNKNOWN) {
-					continue;
+				if (value != UNKNOWN) {
+					field.set(obj, getConvertedValue(field, value));
 				}
-
-				field.set(obj, getConvertedValue(field, value));
 			}
 		}
 	}
