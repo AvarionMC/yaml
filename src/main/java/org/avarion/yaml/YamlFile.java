@@ -7,6 +7,20 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Annotation to specify a header for the YAML file.
+ * This annotation should be applied to the class that extends YamlFileInterface.
+ *
+ * <pre>{@code
+ * @YamlFile(header = """
+ * 	MyApp Configuration
+ * 	  Version 1.0
+ * 	""")
+ * public class MyConfig extends YamlFileInterface {
+ *     // Configuration fields
+ * }
+ * }</pre>
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE})
 public @interface YamlFile {

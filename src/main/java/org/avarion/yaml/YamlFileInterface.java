@@ -15,6 +15,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 
+/**
+ * Abstract class providing utility methods to handle YAML files, including
+ * serialization and deserialization of Java objects.
+ */
 @SuppressWarnings({"unchecked", "unused"})
 public abstract class YamlFileInterface {
 	static final Object UNKNOWN = new Object();
@@ -119,6 +123,19 @@ public abstract class YamlFileInterface {
 		return Enum.valueOf(enumClass, value.toUpperCase());
 	}
 
+	/**
+	 * Loads the YAML content from the specified file into this object.
+	 * If the file doesn't exist, it creates a new file with the current object's content.
+	 *
+	 * @param file The File object representing the YAML file to load.
+	 * @return The current object instance after loading the YAML content.
+	 * @throws IOException If there's an error reading the file or parsing the YAML content.
+	 *
+	 *                     <pre>{@code
+	 *                     MyConfig config = new MyConfig();
+	 *                     config.load(new File("config.yml"));
+	 *                     }</pre>
+	 */
 	public <T extends YamlFileInterface> T load(@NotNull File file) throws IOException {
 		if (!file.exists()) {
 			save(file);
@@ -165,6 +182,20 @@ public abstract class YamlFileInterface {
 		}
 	}
 
+	/**
+	 * Loads the YAML content from the specified file path into this object.
+	 *
+	 * @param file The path to the YAML file as a String.
+	 * @param <T> The type of YamlFileInterface implementation.
+	 * @return The current object instance after loading the YAML content.
+	 * @throws IOException If there's an error reading the file or parsing the YAML content.
+	 * @see #load(File)
+	 *
+	 * <pre>{@code
+	 * MyConfig config = new MyConfig();
+	 * config.load("config.yml");
+	 * }</pre>
+	 */
 	public <T extends YamlFileInterface> T load(@NotNull String file) throws IOException {
 		return load(new File(file));
 	}
@@ -289,6 +320,17 @@ public abstract class YamlFileInterface {
 		return yamlContent;
 	}
 
+	/**
+	 * Saves the current object's content to the specified file in YAML format.
+	 *
+	 * @param file The File object representing the YAML file to save to.
+	 * @throws IOException If there's an error writing to the file.
+	 *
+	 * <pre>{@code
+	 * MyConfig config = new MyConfig();
+	 * config.save(new File("config.yml"));
+	 * }</pre>
+	 */
 	public void save(@NotNull File file) throws IOException {
 		file = file.getAbsoluteFile();
 		file.getParentFile().mkdirs();
@@ -301,6 +343,18 @@ public abstract class YamlFileInterface {
 		}
 	}
 
+	/**
+	 * Saves the current object's content to the specified file path in YAML format.
+	 *
+	 * @param target The path to the YAML file as a String.
+	 * @throws IOException If there's an error writing to the file.
+	 * @see #save(File)
+	 *
+	 * <pre>{@code
+	 * MyConfig config = new MyConfig();
+	 * config.save("config.yml");
+	 * }</pre>
+	 */
 	public void save(@NotNull final String target) throws IOException {
 		save(new File(target));
 	}
