@@ -15,7 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class YamlFileInterfaceTest {
+class YamlFileInterfaceTest {
 	File target;
 
 	private void replaceInTarget(File file, String text, String replacement) throws IOException {
@@ -284,7 +284,7 @@ public class YamlFileInterfaceTest {
 		IOException thrown = assertThrows(IOException.class, () -> {
 			new NonPrimitive().load(target);
 		});
-		assertTrue(thrown.getMessage().contains("Cannot convert String to Character"));
+		assertTrue(thrown.getMessage().contains("Cannot convert String of length 3 to Character"));
 	}
 
 
