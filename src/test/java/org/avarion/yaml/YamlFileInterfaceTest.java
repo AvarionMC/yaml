@@ -236,6 +236,17 @@ public class YamlFileInterfaceTest {
 	}
 
 	@Test
+	void testDifferentBooleanValuesFalse() throws IOException {
+		(new Primitive()).save(target);
+
+		replaceInTarget(target, "true", "\"false\"");
+
+		NonPrimitive loaded = new NonPrimitive().load(target);
+
+		assertFalse(loaded.bln);
+	}
+
+	@Test
 	void testDoubleKeyUsage() {
 		IOException thrown = assertThrows(IOException.class, () -> {
 			(new DoubleKeyUsage()).save(target);

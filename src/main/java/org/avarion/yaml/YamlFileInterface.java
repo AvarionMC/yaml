@@ -181,7 +181,6 @@ public abstract class YamlFileInterface {
 					continue;
 				}
 
-				field.setAccessible(true);
 				field.set(obj, getConvertedValue(field, value));
 			}
 		}
@@ -235,8 +234,6 @@ public abstract class YamlFileInterface {
 
 		// 2. fields
 		for (Field field : clazz.getDeclaredFields()) {
-			field.setAccessible(true);
-
 			YamlKey key = field.getAnnotation(YamlKey.class);
 			if (key == null || key.value().trim().isEmpty()) {
 				continue;
