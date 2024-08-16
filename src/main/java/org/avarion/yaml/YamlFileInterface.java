@@ -61,7 +61,7 @@ public abstract class YamlFileInterface {
 		}
 
 		if (Number.class.isAssignableFrom(value.getClass())) {
-			return convertNumber((Number) value, expectedType);
+			return convertToNumber((Number) value, expectedType);
 		}
 
 		if (isCharacterType(expectedType) && value instanceof String) {
@@ -113,7 +113,7 @@ public abstract class YamlFileInterface {
 		return TRUE_VALUES.contains(strValue);
 	}
 
-	private static Object convertNumber(final Number numValue, final Class<?> expectedType) throws IOException {
+	private static Object convertToNumber(final Number numValue, final Class<?> expectedType) throws IOException {
 		if (expectedType == int.class || expectedType == Integer.class) {
 			return numValue.intValue();
 		}
