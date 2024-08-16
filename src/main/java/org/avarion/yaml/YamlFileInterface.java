@@ -39,14 +39,7 @@ public abstract class YamlFileInterface {
 		Class<?> expectedType = field.getType();
 
 		if (value == null) {
-			if (expectedType.isPrimitive()) {
-				throw new IOException("Cannot assign null to primitive type "
-									  + expectedType.getSimpleName()
-									  + " (field: "
-									  + field.getName()
-									  + ")");
-			}
-			return null;
+			return handleNullValue(expectedType, field);
 		}
 
 		if (expectedType.isEnum() && value instanceof String) {
@@ -54,72 +47,111 @@ public abstract class YamlFileInterface {
 		}
 
 		if (value instanceof List<?>) {
-			List<?> list = (List<?>) value;
-
-			Type genericType = field.getGenericType();
-			if (genericType instanceof ParameterizedType) {
-				Class<?> elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
-				if (elementType.isEnum()) {
-					return list.stream()
-							   .map(item -> stringToEnum((Class<? extends Enum>) elementType, item.toString()))
-							   .collect(Collectors.toList());
-				}
-			}
+			return handleListValue(field, (List<?>) value);
 		}
 
 		if (expectedType.isInstance(value)) {
 			return value;
 		}
 
-		if (expectedType == boolean.class || expectedType == Boolean.class) {
-			if (value instanceof Boolean) {
-				return value;
-			}
-
-			String strValue = value.toString().toLowerCase().trim();
-			return strValue.equals("true") || strValue.equals("yes") || strValue.equals("y") || strValue.equals("1");
+		if (isBooleanType(expectedType)) {
+			return convertToBoolean(value);
 		}
 
 		if (Number.class.isAssignableFrom(value.getClass())) {
-			Number numValue = (Number) value;
-			if (expectedType == int.class || expectedType == Integer.class) {
-				return numValue.intValue();
-			}
-			if (expectedType == double.class || expectedType == Double.class) {
-				return numValue.doubleValue();
-			}
-			if (expectedType == float.class || expectedType == Float.class) {
-				double doubleValue = numValue.doubleValue();
-				if (Math.abs(doubleValue - (float) doubleValue) >= 1e-9) {
-					throw new IOException("Double value "
-										  + doubleValue
-										  + " cannot be precisely represented as a float");
-				}
-				return numValue.floatValue();
-			}
-			if (expectedType == long.class || expectedType == Long.class) {
-				return numValue.longValue();
-			}
-			if (expectedType == short.class || expectedType == Short.class) {
-				return numValue.shortValue();
-			}
-			if (expectedType == byte.class || expectedType == Byte.class) {
-				return numValue.byteValue();
-			}
+			return convertNumber((Number) value, expectedType);
 		}
 
-		if ((expectedType == char.class || expectedType == Character.class)
-			&& value instanceof String
-			&& ((String) value).length() == 1)
-		{
-			String s = (String) value;
-			return s.toCharArray()[0];
+		if (isCharacterType(expectedType) && value instanceof String) {
+			return convertToCharacter((String) value);
 		}
 
 		throw new IOException("Cannot convert "
 							  + value.getClass().getSimpleName()
 							  + " to "
 							  + expectedType.getSimpleName());
+	}
+
+	private static @Nullable Object handleNullValue(@NotNull Class<?> expectedType, Field field) throws IOException {
+		if (expectedType.isPrimitive()) {
+			throw new IOException("Cannot assign null to primitive type "
+								  + expectedType.getSimpleName()
+								  + " (field: "
+								  + field.getName()
+								  + ")");
+		}
+		return null;
+	}
+
+	private static Object handleListValue(@NotNull Field field, List<?> list) {
+		Type genericType = field.getGenericType();
+		if (genericType instanceof ParameterizedType) {
+			Class<?> elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
+			if (elementType.isEnum()) {
+				return list.stream()
+						   .map(item -> stringToEnum((Class<? extends Enum>) elementType, item.toString()))
+						   .collect(Collectors.toList());
+			}
+		}
+		return list;
+	}
+
+	private static boolean isBooleanType(Class<?> type) {
+		return type == boolean.class || type == Boolean.class;
+	}
+
+	private static @NotNull Boolean convertToBoolean(Object value) {
+		if (value instanceof Boolean) {
+			return (Boolean) value;
+		}
+
+		String strValue = value.toString().toLowerCase().trim();
+		return strValue.equals("true") || strValue.equals("yes") || strValue.equals("y") || strValue.equals("1");
+	}
+
+	private static Object convertNumber(Number numValue, Class<?> expectedType) throws IOException {
+		if (expectedType == int.class || expectedType == Integer.class) {
+			return numValue.intValue();
+		}
+		if (expectedType == double.class || expectedType == Double.class) {
+			return numValue.doubleValue();
+		}
+		if (expectedType == float.class || expectedType == Float.class) {
+			return convertToFloat(numValue);
+		}
+		if (expectedType == long.class || expectedType == Long.class) {
+			return numValue.longValue();
+		}
+		if (expectedType == short.class || expectedType == Short.class) {
+			return numValue.shortValue();
+		}
+		if (expectedType == byte.class || expectedType == Byte.class) {
+			return numValue.byteValue();
+		}
+		throw new IOException("Cannot convert "
+							  + numValue.getClass().getSimpleName()
+							  + " to "
+							  + expectedType.getSimpleName());
+	}
+
+	private static float convertToFloat(@NotNull Number numValue) throws IOException {
+		double doubleValue = numValue.doubleValue();
+		if (Math.abs(doubleValue - (float) doubleValue) >= 1e-9) {
+			throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
+		}
+		return numValue.floatValue();
+	}
+
+	private static boolean isCharacterType(Class<?> type) {
+		return type == char.class || type == Character.class;
+	}
+
+	private static @NotNull Character convertToCharacter(final @NotNull String value) throws IOException {
+		if (value.length() == 1) {
+			return value.charAt(0);
+		}
+
+		throw new IOException("Cannot convert String of length " + value.length() + " to Character");
 	}
 
 	private static <E extends Enum<E>> @NotNull E stringToEnum(Class<E> enumClass, @NotNull String value) {

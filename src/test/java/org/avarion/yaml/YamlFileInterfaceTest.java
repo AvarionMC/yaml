@@ -284,7 +284,7 @@ public class YamlFileInterfaceTest {
 		IOException thrown = assertThrows(IOException.class, () -> {
 			new NonPrimitive().load(target);
 		});
-		assertTrue(thrown.getMessage().contains("Cannot convert String to Character"));
+		assertTrue(thrown.getMessage().contains("Cannot convert String of length 3 to Character"));
 	}
 
 
