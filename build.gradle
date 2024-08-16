@@ -17,14 +17,14 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2'
+    compileOnly 'org.yaml:snakeyaml:1.14'
     compileOnly 'org.jetbrains:annotations:24.1.0'
 
+    testRuntimeOnly 'org.yaml:snakeyaml:1.14'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
-
-    testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 test {

@@ -10,6 +10,9 @@ class NestedMap {
 
 	@SuppressWarnings("unchecked")
 	public void put(@Nullable String key, @Nullable String comment, Object value) {
+		if (key == null || key.trim().isEmpty()) {
+			return;
+		}
 		String[] keys = key.split("\\.");
 
 		Map<String, Object> current = map;
@@ -19,7 +22,7 @@ class NestedMap {
 		}
 		final String lastKey = keys[keys.length - 1];
 		if (current.containsKey(lastKey)) {
-			throw new RuntimeException("Configuration error: " + lastKey + " is already used before.");
+			throw new RuntimeException("'" + key + "' is already used before.");
 		}
 
 		current.put(lastKey, new NestedNode(value, comment));

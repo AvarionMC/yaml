@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,34 +44,37 @@ public class YamlFileInterfaceTest {
 
 	@Test
 	public void testSaveAndLoad() throws IOException {
-		YamlFileInterfaceTestImpl1 yamlFile = new YamlFileInterfaceTestImpl1();
+		HappyFlow yamlFile = new HappyFlow();
+
+		assertEquals("New York", yamlFile.city);
+		assertEquals(123, yamlFile.streetNumber);
+
+		yamlFile.city = "Home";
+		yamlFile.streetNumber = 456;
 
 		assertFalse(target.exists());
 		yamlFile.save(target);
 		assertTrue(target.exists());
 
 		// Load the saved file and check if it contains expected content
-		YamlFileInterfaceTestImpl1 loadedYamlFile = YamlFileInterface.load(
-				target,
-				YamlFileInterfaceTestImpl1.class
-		);
+		HappyFlow loaded = new HappyFlow().load(target);
 
-		assertNotNull(loadedYamlFile);
-		assertEquals("John Doe", loadedYamlFile.getName());
-		assertEquals(30, loadedYamlFile.getAge());
-		assertTrue(loadedYamlFile.isStudent());
-		assertEquals(70.5, loadedYamlFile.getWeight());
-		assertEquals(85.5f, loadedYamlFile.getScore());
-		assertEquals(123456789L, loadedYamlFile.getId());
-		assertTrue(loadedYamlFile.isMale());
-		assertEquals("New York", loadedYamlFile.getCity());
-		assertEquals(123, loadedYamlFile.getStreetNumber());
+		assertNotNull(loaded);
+		assertEquals("John Doe", loaded.name);
+		assertEquals(30, loaded.age);
+		assertTrue(loaded.isStudent);
+		assertEquals(70.5, loaded.weight);
+		assertEquals(85.5f, loaded.score);
+		assertEquals(123456789L, loaded.id);
+		assertTrue(loaded.isMale);
+		assertEquals("Home", loaded.city);
+		assertEquals(456, loaded.streetNumber);
 	}
 
 	// Add more test cases as needed for other methods in YamlFileInterface
 	@Test
 	public void testSaveAndLoad2() throws IOException {
-		YamlFileInterfaceTestImpl2 yamlFile = new YamlFileInterfaceTestImpl2();
+		NullOrEmptyKey yamlFile = new NullOrEmptyKey();
 		yamlFile.name1 = "1";
 		yamlFile.name2 = "2";
 		yamlFile.name3 = "3";
@@ -83,19 +87,16 @@ public class YamlFileInterfaceTest {
 		yamlFile.save(target);
 		assertTrue(target.exists());
 
-		YamlFileInterfaceTestImpl2 loadedYamlFile = YamlFileInterface.load(
-				target,
-				YamlFileInterfaceTestImpl2.class
-		);
+		NullOrEmptyKey loaded = new NullOrEmptyKey().load(target);
 
-		assertEquals("A", loadedYamlFile.name1);
-		assertEquals("B", loadedYamlFile.name2);
-		assertEquals("3", loadedYamlFile.name3);
+		assertEquals("A", loaded.name1);
+		assertEquals("B", loaded.name2);
+		assertEquals("3", loaded.name3);
 	}
 
 	@Test
 	public void testEnumerations() throws IOException {
-		final List<Material> def = List.of(Material.A, Material.B);
+		final List<Material> def = Arrays.asList(Material.A, Material.B);
 
 		ListMaterial yamlFile = new ListMaterial();
 
@@ -106,18 +107,18 @@ public class YamlFileInterfaceTest {
 		yamlFile.save(target);
 		assertTrue(target.exists());
 
-		ListMaterial loadedYamlFile = YamlFileInterface.load(target, ListMaterial.class);
-		assertEquals(def, loadedYamlFile.materials);
-		assertEquals(Material.C, loadedYamlFile.material);
+		ListMaterial loaded = new ListMaterial().load(target);
+		assertEquals(def, loaded.materials);
+		assertEquals(Material.C, loaded.material);
 	}
 
 	@Test
 	public void testEnumerationsInvalidEnumItem() throws IOException {
 		(new ListMaterial()).save(target);
-		replaceInTarget(target, "- \"B\"", "- \"D\"");
+		replaceInTarget(target, "- 'B'", "- 'D'");
 
-		IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> {
-			YamlFileInterface.load(target, ListMaterial.class);
+		IOException thrown = assertThrows(IOException.class, () -> {
+			new ListMaterial().load(target);
 		});
 		assertTrue(thrown.getMessage().contains("No enum constant org.avarion.yaml.Material.D"));
 	}
@@ -125,10 +126,10 @@ public class YamlFileInterfaceTest {
 	@Test
 	public void testEnumerationsInvalidEnumItem2() throws IOException {
 		(new ListMaterial()).save(target);
-		replaceInTarget(target, "\"C\"", "2");
+		replaceInTarget(target, "'C'", "2");
 
 		IOException thrown = assertThrows(IOException.class, () -> {
-			YamlFileInterface.load(target, ListMaterial.class);
+			new ListMaterial().load(target);
 		});
 		assertTrue(thrown.getMessage().contains("Cannot convert Integer to Material"));
 	}
@@ -149,7 +150,7 @@ public class YamlFileInterfaceTest {
 		yamlFile.save(target);
 		assertTrue(target.exists());
 
-		Primitive loaded = YamlFileInterface.load(target, Primitive.class);
+		Primitive loaded = new Primitive().load(target);
 		assertEquals(1, loaded.bt);
 		assertEquals('a', loaded.chr);
 		assertEquals(1, loaded.shrt);
@@ -177,9 +178,9 @@ public class YamlFileInterfaceTest {
 		assertTrue(target.exists());
 
 		replaceInTarget(target, "1", "2");
-		replaceInTarget(target, "\"a\"", "\"b\"");
+		replaceInTarget(target, ": a", ": b");
 
-		NonPrimitive loaded = YamlFileInterface.load(target, NonPrimitive.class);
+		NonPrimitive loaded = new NonPrimitive().load(target);
 
 		assertEquals((byte) 2, loaded.bt);
 		assertEquals('b', loaded.chr);
@@ -197,7 +198,7 @@ public class YamlFileInterfaceTest {
 		replaceInTarget(target, "1", "null");
 
 		IOException thrown = assertThrows(IOException.class, () -> {
-			YamlFileInterface.load(target, Primitive.class);
+			new Primitive().load(target);
 		});
 		assertTrue(thrown.getMessage().contains("Cannot assign null to primitive type byte (field: bt)"));
 	}
@@ -206,12 +207,12 @@ public class YamlFileInterfaceTest {
 	public void testNullOnNonPrimitive() throws IOException {
 		(new NonPrimitive()).save(target);
 
-		replaceInTarget(target, "\"a\"", "null");
+		replaceInTarget(target, ": a", ": null");
 		replaceInTarget(target, "1.0", "null");
 		replaceInTarget(target, "1", "null");
 		replaceInTarget(target, "true", "null");
 
-		NonPrimitive loaded = YamlFileInterface.load(target, NonPrimitive.class);
+		NonPrimitive loaded = new NonPrimitive().load(target);
 		assertNull(loaded.bt);
 		assertNull(loaded.chr);
 		assertNull(loaded.shrt);
@@ -229,37 +230,17 @@ public class YamlFileInterfaceTest {
 
 		replaceInTarget(target, "true", val);
 
-		NonPrimitive loaded = YamlFileInterface.load(target, NonPrimitive.class);
+		NonPrimitive loaded = new NonPrimitive().load(target);
 
 		assertTrue(loaded.bln);
 	}
 
 	@Test
-	public void testDoubleKeyUsage() throws IOException {
+	public void testDoubleKeyUsage() {
 		RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
 			(new DoubleKeyUsage()).save(target);
 		});
-		assertTrue(thrown.getMessage().contains("key1 is already used before"));
-	}
-
-	@Test
-	public void testEmptyKey() throws IOException {
-		(new EmptyKey()).save(target);
-
-		assertEquals(0, target.length());
-	}
-
-	@Test
-	public void testInvalidFloatAsDouble() throws IOException {
-		final double value = 1.23456789;
-
-		(new NonPrimitive()).save(target);
-		replaceInTarget(target, "1.0", Double.toString(value));
-
-		IOException thrown = assertThrows(IOException.class, () -> {
-			YamlFileInterface.load(target, NonPrimitive.class);
-		});
-		assertTrue(thrown.getMessage().contains("Double value 1.23456789 cannot be precisely represented as a float"));
+		assertTrue(thrown.getMessage().contains("'key1' is already used before"));
 	}
 
 	@Test
@@ -267,7 +248,7 @@ public class YamlFileInterfaceTest {
 		(new NonPrimitive()).save(target);
 		replaceInTarget(target, "1.0", "2");
 
-		NonPrimitive loaded = YamlFileInterface.load(target.toString(), NonPrimitive.class);
+		NonPrimitive loaded = new NonPrimitive().load(target.toString());
 		assertEquals(2.0f, loaded.flt);
 		assertEquals(2.0d, loaded.dbl);
 	}
@@ -275,10 +256,10 @@ public class YamlFileInterfaceTest {
 	@Test
 	public void testWrongChar() throws IOException {
 		(new NonPrimitive()).save(target);
-		replaceInTarget(target, "\"a\"", "2"); // Now it's an integer
+		replaceInTarget(target, ": a", ": 2"); // Now it's an integer
 
 		IOException thrown = assertThrows(IOException.class, () -> {
-			YamlFileInterface.load(target, NonPrimitive.class);
+			new NonPrimitive().load(target);
 		});
 		assertTrue(thrown.getMessage().contains("Cannot convert Integer to Character"));
 	}
@@ -287,10 +268,10 @@ public class YamlFileInterfaceTest {
 	@Test
 	public void testWrongChar2() throws IOException {
 		(new NonPrimitive()).save(target);
-		replaceInTarget(target, "\"a\"", "\"abc\""); // Now it's a string
+		replaceInTarget(target, ": a", ": abc"); // Now it's a string
 
 		IOException thrown = assertThrows(IOException.class, () -> {
-			YamlFileInterface.load(target, NonPrimitive.class);
+			new NonPrimitive().load(target);
 		});
 		assertTrue(thrown.getMessage().contains("Cannot convert String to Character"));
 	}
@@ -299,7 +280,7 @@ public class YamlFileInterfaceTest {
 	@Test
 	public void testCreateConfigOnLoad() throws IOException {
 		assertFalse(target.exists());
-		Primitive loaded = YamlFileInterface.load(target.toString(), Primitive.class);
+		Primitive loaded = new Primitive().load(target);
 		assertNotNull(loaded);
 		assertTrue(target.exists());
 	}
@@ -307,21 +288,21 @@ public class YamlFileInterfaceTest {
 
 	@Test
 	public void testFinalKeywordOnLoad() throws IOException {
-		(new BlankHeader()).save(target.toString());
+		(new BlankHeader()).save(target.toString()); // First save a good one
 
 		IOException thrown = assertThrows(IOException.class, () -> {
-			YamlFileInterface.load(target.toString(), FinalKeyword.class);
+			new FinalKeyword().load(target.toString()); // And load it with the 'final' keyword one
 		});
-		assertTrue(thrown.getMessage().contains("Attribute 'key' is final"));
+		assertTrue(thrown.getMessage().contains("'key' is final"));
 	}
 
 
 	@Test
-	public void testFinalKeywordOnSave() throws IOException {
+	public void testFinalKeywordOnSave() {
 		IOException thrown = assertThrows(IOException.class, () -> {
 			(new FinalKeyword()).save(target.toString());
 		});
-		assertTrue(thrown.getMessage().contains("Attribute 'key' is final"));
+		assertTrue(thrown.getMessage().contains("'key' is final"));
 	}
 
 
@@ -329,7 +310,7 @@ public class YamlFileInterfaceTest {
 	public void testBlankHeader() throws IOException {
 		(new BlankHeader()).save(target.toString());
 
-		assertEquals("key: 1", Files.readString(target.toPath()).trim());
+		assertEquals("key: 1", new String(Files.readAllBytes(target.toPath())).trim());
 	}
 
 
@@ -337,19 +318,35 @@ public class YamlFileInterfaceTest {
 	public void testSaveAsNormalLoadAsFinal() throws IOException {
 		(new BlankHeader()).save(target.toString());
 
-		assertEquals("key: 1", Files.readString(target.toPath()).trim());
+		assertEquals("key: 1", new String(Files.readAllBytes(target.toPath())).trim());
 	}
 
 
 	@Test
-	public void testNoDefaultConstructor() throws IOException {
-		(new NoDefaultConstructor(123)).save(target.toString());
+	public void testFloatNotDouble() throws IOException {
+		(new Primitive()).save(target.toString());
 
-		assertEquals("key: 123", Files.readString(target.toPath()).trim());
+		replaceInTarget(target, ": 1.0", ": 1.234567890123");
 
 		IOException thrown = assertThrows(IOException.class, () -> {
-			YamlFileInterface.load(target.toString(), NoDefaultConstructor.class);
+			(new Primitive()).load(target.toString());
 		});
-		assertTrue(thrown.getMessage().contains("org.avarion.yaml.NoDefaultConstructor.<init>()"));
+		assertTrue(thrown.getMessage()
+						 .contains("Double value 1.234567890123 cannot be precisely represented as a float"));
+	}
+
+
+	@Test
+	public void testYamlContainsMoreFields() throws IOException {
+		HappyFlow file = new HappyFlow();
+		file.streetNumber = 456;
+		assertEquals(456, file.streetNumber);
+
+		file.save(target.toString());
+
+		replaceInTarget(target, "number: 456", "");
+
+		HappyFlow loaded = new HappyFlow().load(target.toString());
+		assertEquals(123, loaded.streetNumber);
 	}
 }
