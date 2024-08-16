@@ -15,7 +15,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class YamlFileInterfaceTest {
+class YamlFileInterfaceTest {
 	File target;
 
 	private void replaceInTarget(File file, String text, String replacement) throws IOException {
