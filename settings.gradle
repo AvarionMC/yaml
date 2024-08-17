@@ -1,3 +1,1 @@
 rootProject.name = 'yaml'
-
-System.setProperty("sonar.gradle.skipCompile", "true")
