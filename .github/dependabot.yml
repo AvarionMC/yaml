@@ -11,9 +11,11 @@ updates:
 
     commit-message:
       prefix: ci
-    labels: [ "skip changelog" ]
 
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "org.yaml:snakeyaml"  # We want to stay on 1.14 to support as many versions of MC as possible
+        versions: [ "< 2" ]
