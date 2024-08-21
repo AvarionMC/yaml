@@ -369,7 +369,7 @@ class YamlFileInterfaceTest {
 	@Test
 	void testListAsStringNotEnum() throws IOException {
 
-		ListYml file = new ListYml();
+		ListYmlString file = new ListYmlString();
 		file.key = Arrays.asList("b", "c");
 		assertEquals(Arrays.asList("b", "c"), file.key);
 
@@ -377,7 +377,22 @@ class YamlFileInterfaceTest {
 
 		replaceInTarget(target, "c", "d");
 
-		ListYml loaded = new ListYml().load(target);
+		ListYmlString loaded = new ListYmlString().load(target);
 		assertEquals(Arrays.asList("b", "d"), loaded.key);
+	}
+
+	@Test
+	void testListAsInts() throws IOException {
+
+		ListYmlInt file = new ListYmlInt();
+		file.key = Arrays.asList(2, 3);
+		assertEquals(Arrays.asList(2, 3), file.key);
+
+		file.save(target);
+
+		replaceInTarget(target, "3", "4");
+
+		ListYmlInt loaded = new ListYmlInt().load(target);
+		assertEquals(Arrays.asList(2, 4), loaded.key);
 	}
 }
