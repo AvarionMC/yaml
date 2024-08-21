@@ -135,3 +135,8 @@ class BlankHeader extends YamlFileInterface {
 	@YamlKey("key")
 	public int key = 1;
 }
+
+class ListYml extends YamlFileInterface {
+	@YamlKey("key")
+	public List<String> key = Arrays.asList("a", "b");
+}
