@@ -365,4 +365,34 @@ class YamlFileInterfaceTest {
 		HappyFlow loaded = new HappyFlow().load(target.toString());
 		assertEquals(123, loaded.streetNumber);
 	}
+
+	@Test
+	void testListAsStringNotEnum() throws IOException {
+
+		ListYmlString file = new ListYmlString();
+		file.key = Arrays.asList("b", "c");
+		assertEquals(Arrays.asList("b", "c"), file.key);
+
+		file.save(target);
+
+		replaceInTarget(target, "c", "d");
+
+		ListYmlString loaded = new ListYmlString().load(target);
+		assertEquals(Arrays.asList("b", "d"), loaded.key);
+	}
+
+	@Test
+	void testListAsInts() throws IOException {
+
+		ListYmlInt file = new ListYmlInt();
+		file.key = Arrays.asList(2, 3);
+		assertEquals(Arrays.asList(2, 3), file.key);
+
+		file.save(target);
+
+		replaceInTarget(target, "3", "4");
+
+		ListYmlInt loaded = new ListYmlInt().load(target);
+		assertEquals(Arrays.asList(2, 4), loaded.key);
+	}
 }
