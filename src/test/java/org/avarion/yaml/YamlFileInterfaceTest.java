@@ -395,4 +395,13 @@ class YamlFileInterfaceTest {
 		ListYmlInt loaded = new ListYmlInt().load(target);
 		assertEquals(Arrays.asList(2, 4), loaded.key);
 	}
+
+	@Test
+	void testCannotAssignNullToDouble() throws IOException {
+		new Primitive().save(target);
+		replaceInTarget(target, "double: 1.0", "");
+
+		Primitive loaded = new Primitive().load(target);
+		assertEquals(1.0, loaded.dbl);
+	}
 }

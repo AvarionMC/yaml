@@ -80,7 +80,7 @@ public abstract class YamlFileInterface {
         return null;
     }
 
-    private static Object handleListValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final List<?> list) throws IOException {
+    private static @NotNull Object handleListValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final List<?> list) throws IOException {
         if (!List.class.isAssignableFrom(expectedType)) {
             throw new IOException("Expected a List, but got " + expectedType.getSimpleName());
         }
@@ -175,9 +175,9 @@ public abstract class YamlFileInterface {
      * @throws IOException If there's an error reading the file or parsing the YAML content.
      *
      *                     <pre>{@code
-     *                                                                                                                         MyConfig config = new MyConfig();
-     *                                                                                                                         config.load(new File("config.yml"));
-     *                                                                                                                         }</pre>
+     *                                                                                                                                                                                                         MyConfig config = new MyConfig();
+     *                                                                                                                                                                                                         config.load(new File("config.yml"));
+     *                                                                                                                                                                                                         }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
         if (!file.exists()) {
@@ -213,7 +213,7 @@ public abstract class YamlFileInterface {
                 }
 
                 String key = annotation.value();
-                Object value = getNestedValue(data, key);
+                Object value = getNestedValue(data, new ArrayList<>(Arrays.asList(key.split("\\."))));
                 if (value!=UNKNOWN) {
                     field.set(obj, getConvertedValue(field, value));
                 }
@@ -239,19 +239,28 @@ public abstract class YamlFileInterface {
         return load(new File(file));
     }
 
-    private static Object getNestedValue(final Map<String, Object> map, final @NotNull String key) {
-        String[] keys = key.split("\\.");
+    private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull List<String> keys) {
+        final String key = keys.remove(0);
 
-        Object current = map;
-        for (String k : keys) {
-            if (current instanceof Map) {
-                current = ((Map<?, ?>) current).get(k);
-            }
-            else {
-                return UNKNOWN;
-            }
+        if (!map.containsKey(key)) {
+            // Unknown inside the map
+            return UNKNOWN;
         }
-        return current;
+
+        Object tmp = map.get(key);
+
+        if (keys.isEmpty()) {
+            // Final element
+            return tmp;
+        }
+
+        if (!(tmp instanceof Map)) {
+            // If it's not a map, and we still have deeper to dig --> No clue what that is?!
+            return UNKNOWN;
+        }
+
+        // Go deeper...
+        return getNestedValue((Map<String, Object>) tmp, keys);
     }
 
     private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey {
@@ -361,9 +370,9 @@ public abstract class YamlFileInterface {
      * @throws IOException If there's an error writing to the file.
      *
      *                     <pre>{@code
-     *                                                                                                     MyConfig config = new MyConfig();
-     *                                                                                                     config.save(new File("config.yml"));
-     *                                                                                                     }</pre>
+     *                                                                                                                                                                                                                             MyConfig config = new MyConfig();
+     *                                                                                                                                                                                                                             config.save(new File("config.yml"));
+     *                                                                                                                                                                                                                             }</pre>
      */
     public void save(final @NotNull File file) throws IOException {
         final File newFile = file.getAbsoluteFile();
