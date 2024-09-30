@@ -21,7 +21,7 @@ repositories {
 
 dependencies {
     compileOnly 'org.yaml:snakeyaml:1.14'
-    compileOnly 'org.jetbrains:annotations:24.1.0'
+    compileOnly 'org.jetbrains:annotations:25.0.0'
 
     testRuntimeOnly 'org.yaml:snakeyaml:1.14'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.0'
