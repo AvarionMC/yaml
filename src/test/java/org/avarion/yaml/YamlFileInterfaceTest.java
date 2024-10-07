@@ -204,6 +204,17 @@ class YamlFileInterfaceTest {
 	}
 
 	@Test
+	void testNullOnPrimitiveButNotExistingField() throws IOException {
+		(new Primitive()).save(target);
+		replaceInTarget(target, "byte: 1\n", "");
+
+		IOException thrown = assertThrows(IOException.class, () -> {
+			new Primitive().load(target);
+		});
+		assertTrue(thrown.getMessage().contains("Cannot assign null to primitive type byte (field: bt)"));
+	}
+
+	@Test
 	void testNullOnNonPrimitive() throws IOException {
 		(new NonPrimitive()).save(target);
 
