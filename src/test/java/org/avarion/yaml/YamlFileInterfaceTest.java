@@ -208,10 +208,8 @@ class YamlFileInterfaceTest {
 		(new Primitive()).save(target);
 		replaceInTarget(target, "byte: 1\n", "");
 
-		IOException thrown = assertThrows(IOException.class, () -> {
-			new Primitive().load(target);
-		});
-		assertTrue(thrown.getMessage().contains("Cannot assign null to primitive type byte (field: bt)"));
+        Primitive loaded = new Primitive().load(target);
+        assertEquals((byte) 1, loaded.bt);
 	}
 
 	@Test
@@ -415,4 +413,38 @@ class YamlFileInterfaceTest {
 		Primitive loaded = new Primitive().load(target);
 		assertEquals(1.0, loaded.dbl);
 	}
+
+    @Test
+    void testCustomStringAcceptingObject() throws IOException {
+        CustomStringYml file = new CustomStringYml();
+        assertEquals(file.key.s, "str");
+
+        file.save(target);
+        replaceInTarget(target, "key: str", "key: abc");
+
+        CustomStringYml loaded = new CustomStringYml().load(target);
+        assertEquals(loaded.key.s, "abc");
+    }
+
+    @Test
+    void testCustomNotStringAcceptingObject() throws IOException {
+        new CustomNonStringYml().save(target);
+        replaceInTarget(target, "123", "456");
+
+        IOException thrown = assertThrows(IOException.class, () -> {
+            new CustomNonStringYml().load(target.toString());
+        });
+        assertEquals(thrown.getMessage(), "'CustomNonStringAcceptingClass' doesn't accept a single String argument to create the object.");
+    }
+
+    @Test
+    void testCharRequiredButIntGotten() throws IOException {
+        new Primitive().save(target);
+        replaceInTarget(target, "char: a", "char: ['a']");
+        IOException thrown = assertThrows(IOException.class, () -> {
+            new Primitive().load(target.toString());
+        });
+        assertEquals(thrown.getMessage(), "Expected a List, but got char");
+    }
 }
+

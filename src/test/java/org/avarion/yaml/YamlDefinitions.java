@@ -145,3 +145,40 @@ class ListYmlInt extends YamlFileInterface {
 	@YamlKey("key")
 	public List<Integer> key = Arrays.asList(1, 2);
 }
+
+class CustomStringAcceptingClass {
+    public String s;
+
+    public CustomStringAcceptingClass(final String s) {
+        this.s = s;
+    }
+
+    @Override
+    public String toString() {
+        return s;
+    }
+}
+
+class CustomNonStringAcceptingClass {
+    public int i;
+
+    public CustomNonStringAcceptingClass(final int i) {
+        this.i = i;
+    }
+
+    @Override
+    public String toString() {
+        return String.valueOf(i);
+    }
+}
+
+class CustomStringYml extends YamlFileInterface {
+    @YamlKey("key")
+    public CustomStringAcceptingClass key = new CustomStringAcceptingClass("str");
+}
+
+class CustomNonStringYml extends YamlFileInterface {
+    @YamlKey("key")
+    public CustomNonStringAcceptingClass key = new CustomNonStringAcceptingClass(123);
+}
+
