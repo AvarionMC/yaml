@@ -16,18 +16,20 @@ import java.util.*;
  * Abstract class providing utility methods to handle YAML files, including
  * serialization and deserialization of Java objects.
  */
-@SuppressWarnings({"unchecked", "unused"})
+@SuppressWarnings("unchecked")
 public abstract class YamlFileInterface {
     static final Object UNKNOWN = new Object();
     private static final Yaml yaml;
     private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
     static {
+        ToStringRepresenter representer = new ToStringRepresenter();
+
         DumperOptions options = new org.yaml.snakeyaml.DumperOptions();
         options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
         options.setPrettyFlow(true);
 
-        yaml = new Yaml(options);
+        yaml = new Yaml(representer, options);
     }
 
     private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value) throws IOException {
@@ -60,8 +62,8 @@ public abstract class YamlFileInterface {
             return convertToNumber((Number) value, expectedType);
         }
 
-        if (isCharacterType(expectedType) && value instanceof String) {
-            return convertToCharacter((String) value);
+        if (isCharacterType(expectedType)) {
+            return convertToCharacter(String.valueOf(value));
         }
 
         // For other classes, attempt to use their constructor that takes a String parameter
@@ -69,7 +71,7 @@ public abstract class YamlFileInterface {
             Constructor<?> constructor = expectedType.getConstructor(String.class);
             return constructor.newInstance(value.toString());
         } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-            throw new IOException("What else could be going on here? type: " + value.getClass().getSimpleName() + " -> " + expectedType.getSimpleName());
+            throw new IOException("'" + expectedType.getSimpleName() + "' doesn't accept a single String argument to create the object.");
         }
     }
 
@@ -174,10 +176,10 @@ public abstract class YamlFileInterface {
      * @return The current object instance after loading the YAML content.
      * @throws IOException If there's an error reading the file or parsing the YAML content.
      *
-     *                     <pre>{@code
-     *                                                                                                                                                                                                         MyConfig config = new MyConfig();
-     *                                                                                                                                                                                                         config.load(new File("config.yml"));
-     *                                                                                                                                                                                                         }</pre>
+     * <pre>{@code
+     * MyConfig config = new MyConfig();
+     * config.load(new File("config.yml"));
+     * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
         if (!file.exists()) {
@@ -355,8 +357,8 @@ public abstract class YamlFileInterface {
         String yamlContent = writer.toString().trim();
 
         if (value instanceof Enum) {
+            // Remove the tag in the yaml
             // !!org.avarion.yaml.Material 'A' --> 'A'
-            assert yamlContent.startsWith("!!");
             yamlContent = yamlContent.replaceAll("^!!\\S+\\s+", "");
         }
 
@@ -369,10 +371,10 @@ public abstract class YamlFileInterface {
      * @param file The File object representing the YAML file to save to.
      * @throws IOException If there's an error writing to the file.
      *
-     *                     <pre>{@code
-     *                                                                                                                                                                                                                             MyConfig config = new MyConfig();
-     *                                                                                                                                                                                                                             config.save(new File("config.yml"));
-     *                                                                                                                                                                                                                             }</pre>
+     * <pre>{@code
+     * MyConfig config = new MyConfig();
+     * config.save(new File("config.yml"));
+     * }</pre>
      */
     public void save(final @NotNull File file) throws IOException {
         final File newFile = file.getAbsoluteFile();
