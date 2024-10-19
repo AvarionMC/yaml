@@ -10,7 +10,7 @@ import java.nio.file.Files;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class YamlMapTest extends TestCommon {
+class YamlMapTest extends TestCommon {
 
     @Test
     void testYamlMapReadWrite() throws IOException {
@@ -51,7 +51,8 @@ public class YamlMapTest extends TestCommon {
         // Corrupt the YAML structure
         Files.write(target.toPath(), "bosses: invalidstructure".getBytes());
 
-        assertThrows(IllegalStateException.class, () -> new BossConfig().load(target));
+        BossConfig config = new BossConfig();
+        assertThrows(IllegalStateException.class, () -> config.load(target));
     }
 
     @Test

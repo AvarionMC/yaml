@@ -217,10 +217,10 @@ public abstract class YamlFileInterface {
                 }
 
                 if (keyAnnotation!=null && !keyAnnotation.value().trim().isEmpty()) {
-                    processYamlKeyField(data, field, keyAnnotation);
+                    readYamlKeyField(data, field, keyAnnotation);
                 }
                 else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
-                    processYamlMapField(data, field, mapAnnotation);
+                    readYamlMapField(data, field, mapAnnotation);
                 }
             }
         }
@@ -413,7 +413,7 @@ public abstract class YamlFileInterface {
         save(new File(target));
     }
 
-    private void processYamlKeyField(Map<String, Object> data, @NotNull Field field, YamlKey annotation)
+    private void readYamlKeyField(Map<String, Object> data, @NotNull Field field, YamlKey annotation)
             throws FinalAttribute, IllegalAccessException, IOException {
         if (Modifier.isFinal(field.getModifiers())) {
             throw new FinalAttribute(field.getName());
@@ -426,17 +426,16 @@ public abstract class YamlFileInterface {
         }
     }
 
-    private void processYamlMapField(Map<String, Object> data, @NotNull Field field, YamlMap annotation) throws IllegalAccessException, FinalAttribute {
+    private void readYamlMapField(Map<String, Object> data, @NotNull Field field, YamlMap annotation) throws IllegalAccessException, FinalAttribute {
         if (Modifier.isFinal(field.getModifiers())) {
             throw new FinalAttribute(field.getName());
         }
 
         String mapKey = annotation.value();
         Object mapValue = getNestedValue(data, mapKey.split("\\."));
-        if (mapValue==null) {
+        if (mapValue==UNKNOWN || mapValue==null) {
             return; // Not provided: don't change the default values
         }
-
 
         try {
             Map<String, Object> fieldMap = (Map<String, Object>) mapValue;
