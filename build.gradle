@@ -6,8 +6,8 @@ plugins {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_1_9
+    targetCompatibility = JavaVersion.VERSION_1_9
 }
 
 tasks.withType(JavaCompile).configureEach { // both compileJave & compileTestJava
@@ -28,6 +28,7 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.11.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.jetbrains:annotations:24.1.0'
 }
 
 test {
