@@ -11,7 +11,7 @@ import java.util.Map;
 public @interface YamlMap {
     String value();
 
-    Class<? extends YamlMapProcessor<? extends YamlFileInterface>> processor();
+    Class<? extends YamlMapProcessor<YamlFileInterface>> processor();
 
     interface YamlMapProcessor<T extends YamlFileInterface> {
         void read(T obj, String key, Map<String, Object> value);
