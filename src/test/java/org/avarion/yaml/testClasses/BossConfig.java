@@ -4,11 +4,18 @@ import org.avarion.yaml.YamlFileInterface;
 import org.avarion.yaml.YamlMap;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class BossConfig extends YamlFileInterface {
     @YamlMap(value = "bosses", processor = BossConfig.BossProcessor.class)
-    public Map<String, Boss> bosses = Map.of("boss1", new Boss("name1", "internal1", "arena1"), "boss2", new Boss("name2", "internal2", "arena2"));
+    public Map<String, Boss> bosses;
+
+    public BossConfig() {
+        bosses = new HashMap<>();
+        bosses.put("boss1", new Boss("name1", "internal1", "arena1"));
+        bosses.put("boss2", new Boss("name2", "internal2", "arena2"));
+    }
 
     public static class BossProcessor implements YamlMap.YamlMapProcessor<BossConfig> {
         @Override
@@ -22,7 +29,7 @@ public class BossConfig extends YamlFileInterface {
         @Override
         public Map<String, Object> write(BossConfig obj, String key, Object value) {
             Boss boss = (Boss) value;
-            Map<String, Object> map = new HashMap<>();
+            Map<String, Object> map = new LinkedHashMap<>();
             map.put("name", boss.getName());
             map.put("internal_name", boss.getInternalName());
             map.put("arena", boss.getArena());

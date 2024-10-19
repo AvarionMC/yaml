@@ -244,6 +244,10 @@ public abstract class YamlFileInterface {
         return load(new File(file));
     }
 
+    private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull String[] keys) {
+        return getNestedValue(map, new ArrayList<>(Arrays.asList(keys)));
+    }
+
     private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull List<String> keys) {
         final String key = keys.remove(0);
 
@@ -416,7 +420,7 @@ public abstract class YamlFileInterface {
         }
 
         String key = annotation.value();
-        Object value = getNestedValue(data, new ArrayList<>(Arrays.asList(key.split("\\."))));
+        Object value = getNestedValue(data, key.split("\\."));
         if (value!=UNKNOWN) {
             field.set(this, getConvertedValue(field, value));
         }
@@ -428,35 +432,26 @@ public abstract class YamlFileInterface {
         }
 
         String mapKey = annotation.value();
-        Object mapValue = getNestedValue(data, new ArrayList<>(Arrays.asList(mapKey.split("\\."))));
+        Object mapValue = getNestedValue(data, mapKey.split("\\."));
+        if (mapValue==null) {
+            return; // Not provided: don't change the default values
+        }
 
-        Map<String, Object> fieldMap;
-        if (mapValue instanceof Map) {
-            fieldMap = new HashMap<>((Map<String, Object>) mapValue);
-        }
-        else {
-            fieldMap = new HashMap<>();
-        }
 
         try {
+            Map<String, Object> fieldMap = (Map<String, Object>) mapValue;
+
             YamlMap.YamlMapProcessor<YamlFileInterface> processor = (YamlMap.YamlMapProcessor<YamlFileInterface>) annotation.processor()
                                                                                                                             .getDeclaredConstructor()
                                                                                                                             .newInstance();
+            field.set(this, new LinkedHashMap<>());
+
             for (Map.Entry<String, Object> entry : fieldMap.entrySet()) {
                 if (entry.getValue() instanceof Map) {
                     processor.read(this, entry.getKey(), (Map<String, Object>) entry.getValue());
                 }
             }
-
-            // If the field is empty after processing, use the default value
-            Map<String, ?> resultMap = (Map<String, ?>) field.get(this);
-            if (resultMap==null || resultMap.isEmpty()) {
-                field.set(this, field.get(this)); // This will use the default value if it exists
-            }
-            else {
-                field.set(this, resultMap);
-            }
-        } catch (InstantiationException | NoSuchMethodException | InvocationTargetException e) {
+        } catch (InstantiationException | NoSuchMethodException | InvocationTargetException | ClassCastException e) {
             throw new IllegalStateException("Failed to instantiate YamlMapProcessor", e);
         }
     }

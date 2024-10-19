@@ -1,6 +1,5 @@
 package org.avarion.yaml;
 
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.io.File;
@@ -12,9 +11,9 @@ import java.nio.file.StandardOpenOption;
 public class TestCommon {
     File target;
 
-    protected void replaceInTarget(@NotNull File file, String text, String replacement) throws IOException {
+    protected void replaceInTarget(String text, String replacement) throws IOException {
         // Read all lines from the file into a string
-        Path filePath = file.toPath();
+        Path filePath = target.toPath();
         String content = new String(Files.readAllBytes(filePath));
 
         // Replace the target text with the replacement

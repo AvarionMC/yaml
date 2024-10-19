@@ -87,7 +87,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testEnumerationsInvalidEnumItem() throws IOException {
         (new ListMaterial()).save(target);
-        replaceInTarget(target, "- 'B'", "- 'D'");
+        replaceInTarget("- 'B'", "- 'D'");
 
         IOException thrown = assertThrows(IOException.class, () -> {
             new ListMaterial().load(target);
@@ -98,7 +98,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testEnumerationsInvalidEnumItem2() throws IOException {
         (new ListMaterial()).save(target);
-        replaceInTarget(target, "'C'", "2");
+        replaceInTarget("'C'", "2");
 
         IOException thrown = assertThrows(IOException.class, () -> {
             new ListMaterial().load(target);
@@ -149,8 +149,8 @@ class YamlFileInterfaceTest extends TestCommon {
         yamlFile.save(target);
         assertTrue(target.exists());
 
-        replaceInTarget(target, "1", "2");
-        replaceInTarget(target, ": a", ": b");
+        replaceInTarget("1", "2");
+        replaceInTarget(": a", ": b");
 
         NonPrimitive loaded = new NonPrimitive().load(target);
 
@@ -167,7 +167,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testNullOnPrimitive() throws IOException {
         (new Primitive()).save(target);
-        replaceInTarget(target, "1", "null");
+        replaceInTarget("1", "null");
 
         IOException thrown = assertThrows(IOException.class, () -> {
             new Primitive().load(target);
@@ -178,7 +178,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testNullOnPrimitiveButNotExistingField() throws IOException {
         (new Primitive()).save(target);
-        replaceInTarget(target, "byte: 1\n", "");
+        replaceInTarget("byte: 1\n", "");
 
         Primitive loaded = new Primitive().load(target);
         assertEquals((byte) 1, loaded.bt);
@@ -188,10 +188,10 @@ class YamlFileInterfaceTest extends TestCommon {
     void testNullOnNonPrimitive() throws IOException {
         (new NonPrimitive()).save(target);
 
-        replaceInTarget(target, ": a", ": null");
-        replaceInTarget(target, "1.0", "null");
-        replaceInTarget(target, "1", "null");
-        replaceInTarget(target, "true", "null");
+        replaceInTarget(": a", ": null");
+        replaceInTarget("1.0", "null");
+        replaceInTarget("1", "null");
+        replaceInTarget("true", "null");
 
         NonPrimitive loaded = new NonPrimitive().load(target);
         assertNull(loaded.bt);
@@ -209,7 +209,7 @@ class YamlFileInterfaceTest extends TestCommon {
     void testDifferentBooleanValues(final String val) throws IOException {
         (new Primitive()).save(target);
 
-        replaceInTarget(target, "true", val);
+        replaceInTarget("true", val);
 
         NonPrimitive loaded = new NonPrimitive().load(target);
 
@@ -220,7 +220,7 @@ class YamlFileInterfaceTest extends TestCommon {
     void testDifferentBooleanValuesFalse() throws IOException {
         (new Primitive()).save(target);
 
-        replaceInTarget(target, "true", "\"false\"");
+        replaceInTarget("true", "\"false\"");
 
         NonPrimitive loaded = new NonPrimitive().load(target);
 
@@ -238,7 +238,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testIntAsDoubleValue() throws IOException {
         (new NonPrimitive()).save(target);
-        replaceInTarget(target, "1.0", "2");
+        replaceInTarget("1.0", "2");
 
         NonPrimitive loaded = new NonPrimitive().load(target.toString());
         assertEquals(2.0f, loaded.flt);
@@ -248,7 +248,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testWrongChar() throws IOException {
         (new NonPrimitive()).save(target);
-        replaceInTarget(target, ": a", ": 2"); // Now it's an integer
+        replaceInTarget(": a", ": 2"); // Now it's an integer
 
         IOException thrown = assertThrows(IOException.class, () -> {
             new NonPrimitive().load(target);
@@ -259,7 +259,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testWrongChar2() throws IOException {
         (new NonPrimitive()).save(target);
-        replaceInTarget(target, ": a", ": abc"); // Now it's a string
+        replaceInTarget(": a", ": abc"); // Now it's a string
 
         IOException thrown = assertThrows(IOException.class, () -> {
             new NonPrimitive().load(target);
@@ -316,7 +316,7 @@ class YamlFileInterfaceTest extends TestCommon {
     void testFloatNotDouble() throws IOException {
         (new Primitive()).save(target.toString());
 
-        replaceInTarget(target, ": 1.0", ": 1.234567890123");
+        replaceInTarget(": 1.0", ": 1.234567890123");
 
         IOException thrown = assertThrows(IOException.class, () -> {
             (new Primitive()).load(target.toString());
@@ -332,7 +332,7 @@ class YamlFileInterfaceTest extends TestCommon {
 
         file.save(target.toString());
 
-        replaceInTarget(target, "number: 456", "");
+        replaceInTarget("number: 456", "");
 
         HappyFlow loaded = new HappyFlow().load(target.toString());
         assertEquals(123, loaded.streetNumber);
@@ -347,7 +347,7 @@ class YamlFileInterfaceTest extends TestCommon {
 
         file.save(target);
 
-        replaceInTarget(target, "c", "d");
+        replaceInTarget("c", "d");
 
         ListYmlString loaded = new ListYmlString().load(target);
         assertEquals(Arrays.asList("b", "d"), loaded.key);
@@ -362,7 +362,7 @@ class YamlFileInterfaceTest extends TestCommon {
 
         file.save(target);
 
-        replaceInTarget(target, "3", "4");
+        replaceInTarget("3", "4");
 
         ListYmlInt loaded = new ListYmlInt().load(target);
         assertEquals(Arrays.asList(2, 4), loaded.key);
@@ -371,7 +371,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testCannotAssignNullToDouble() throws IOException {
         new Primitive().save(target);
-        replaceInTarget(target, "double: 1.0", "");
+        replaceInTarget("double: 1.0", "");
 
         Primitive loaded = new Primitive().load(target);
         assertEquals(1.0, loaded.dbl);
@@ -383,7 +383,7 @@ class YamlFileInterfaceTest extends TestCommon {
         assertEquals("str", file.key.s);
 
         file.save(target);
-        replaceInTarget(target, "key: str", "key: abc");
+        replaceInTarget("key: str", "key: abc");
 
         CustomStringYml loaded = new CustomStringYml().load(target);
         assertEquals("abc", loaded.key.s);
@@ -392,7 +392,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testCustomNotStringAcceptingObject() throws IOException {
         new CustomNonStringYml().save(target);
-        replaceInTarget(target, "123", "456");
+        replaceInTarget("123", "456");
 
         IOException thrown = assertThrows(IOException.class, () -> {
             new CustomNonStringYml().load(target.toString());
@@ -403,7 +403,7 @@ class YamlFileInterfaceTest extends TestCommon {
     @Test
     void testCharRequiredButIntGotten() throws IOException {
         new Primitive().save(target);
-        replaceInTarget(target, "char: a", "char: ['a']");
+        replaceInTarget("char: a", "char: ['a']");
         IOException thrown = assertThrows(IOException.class, () -> {
             new Primitive().load(target.toString());
         });
