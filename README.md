@@ -106,5 +106,5 @@ Leniency can be one of `UNDEFINED`, `STRICT` or `LENIENT`
 
 What does this mean?
 - If you define a field as char, and a string is given. In `STRICT` mode, it will give an error. In `LENIENT` mode it just takes the first character, discarding the rest.
-- If you define a field as a float, and pass in for example 0.51, this is actually 0.50999999... So not exactly the same. In `LENIENT` mode no error will be given, but in `STRICT` mode it will throw an exception.
+- If you define a field as a float, and pass in for example 0.51, this is actually 0.5099999904632568 \[[Wikipedia](https://en.wikipedia.org/wiki/Floating-point_arithmetic)]. So not exactly the same. In `LENIENT` mode no error will be given, but in `STRICT` mode it will throw an exception.
 
