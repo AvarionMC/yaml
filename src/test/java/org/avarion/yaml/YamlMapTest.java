@@ -114,8 +114,9 @@ class YamlMapTest extends TestCommon {
         TestClass config = new TestClass();
         config.save(target);
 
+        TestClass loaded = new TestClass();
         IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> {
-            new TestClass().load(target);
+            loaded.load(target);
         });
         assertEquals("Field emptyMap cannot have both @YamlKey and @YamlMap annotations", thrown.getMessage());
     }

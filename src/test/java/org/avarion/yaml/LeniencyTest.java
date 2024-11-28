@@ -6,7 +6,7 @@ import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class LeniencyTest extends TestCommon {
+class LeniencyTest extends TestCommon {
 
     @Test
     void testFloatNotDoubleLenient() throws IOException {

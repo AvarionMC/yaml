@@ -78,7 +78,11 @@ public abstract class YamlFileInterface {
 
     private static @Nullable Object handleNullValue(final @NotNull Class<?> expectedType, final Field field) throws IOException {
         if (expectedType.isPrimitive()) {
-            throw new IOException("Cannot assign null to primitive type " + expectedType.getSimpleName() + " (field: " + field.getName() + ")");
+            String message = "Cannot assign null to primitive type " + expectedType.getSimpleName();
+            if (field != null) {
+                message += " (field: " + field.getName() + ")";
+            }
+            throw new IOException(message);
         }
         return null;
     }
