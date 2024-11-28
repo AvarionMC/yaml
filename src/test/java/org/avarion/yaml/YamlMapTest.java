@@ -1,13 +1,13 @@
 package org.avarion.yaml;
 
-import org.avarion.yaml.testClasses.Boss;
-import org.avarion.yaml.testClasses.BossConfig;
-import org.avarion.yaml.testClasses.EmptyMapConfig;
+import org.avarion.yaml.testClasses.*;
 import org.junit.jupiter.api.Test;
 
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -89,5 +89,54 @@ class YamlMapTest extends TestCommon {
         Boss boss1 = loaded.bosses.get("boss1");
         assertNotNull(boss1);
         assertEquals("arena3", boss1.getArena());
+    }
+
+    @Test
+    void testYamlMapAndKeyDefined() throws IOException {
+        class TestClass extends YamlFileInterface {
+            @YamlKey(value="key")
+            @YamlMap(value = "emptyMap", processor = TestClass.Processor.class)
+            public Map<String, Object> emptyMap = new HashMap<>();
+
+            class Processor implements YamlMap.YamlMapProcessor<TestClass> {
+                @Override
+                public void read(TestClass obj, String key, Map<String, Object> value) {
+                    // Do nothing, keep the map empty
+                }
+
+                @Override
+                public Map<String, Object> write(TestClass obj, String key, Object value) {
+                    return Map.of();
+                }
+            }
+        }
+
+        TestClass config = new TestClass();
+        config.save(target);
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> {
+            new TestClass().load(target);
+        });
+        assertEquals("Field emptyMap cannot have both @YamlKey and @YamlMap annotations", thrown.getMessage());
+    }
+
+    @Test
+    void testYamlEmptyMapName() throws IOException {
+        try (FileWriter writer = new FileWriter(target)) {
+            writer.write("a:\n  b:\n    c: 1\n    d: 2");
+        }
+
+        MapTestClass loaded = new MapTestClass().load(target);
+        assertEquals(Map.of("obj", 1), loaded.tmp);
+    }
+
+    @Test
+    void testYamlNoMap() throws IOException {
+        try (FileWriter writer = new FileWriter(target)) {
+            writer.write("a:\n  c: 1\n  d: 2");
+        }
+
+        MapTestClass loaded = new MapTestClass().load(target);
+        assertEquals(Map.of(), loaded.tmp);
     }
 }
