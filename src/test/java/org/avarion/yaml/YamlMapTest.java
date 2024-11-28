@@ -5,6 +5,7 @@ import org.avarion.yaml.testClasses.BossConfig;
 import org.avarion.yaml.testClasses.EmptyMapConfig;
 import org.junit.jupiter.api.Test;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 
@@ -41,6 +42,16 @@ class YamlMapTest extends TestCommon {
         EmptyMapConfig config = new EmptyMapConfig();
         config.save(target);
 
+        EmptyMapConfig loaded = new EmptyMapConfig().load(target);
+        assertNotNull(loaded.emptyMap);
+        assertTrue(loaded.emptyMap.isEmpty());
+    }
+
+    @Test
+    void testYamlMapEmptyFile() throws IOException {
+        try (FileWriter writer = new FileWriter(target)) {
+            writer.write("");
+        }
         EmptyMapConfig loaded = new EmptyMapConfig().load(target);
         assertNotNull(loaded.emptyMap);
         assertTrue(loaded.emptyMap.isEmpty());

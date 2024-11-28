@@ -20,4 +20,5 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 public @interface YamlKey {
 	String value() default "";
+    Leniency lenient() default Leniency.UNDEFINED;
 }

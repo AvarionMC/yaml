@@ -369,6 +369,21 @@ class YamlFileInterfaceTest extends TestCommon {
     }
 
     @Test
+    void testListWithoutType() throws IOException {
+
+        ListNoParam file = new ListNoParam();
+        file.key = Arrays.asList(2, 3);
+        assertEquals(Arrays.asList(2, 3), file.key);
+
+        file.save(target);
+
+        replaceInTarget("3", "4");
+
+        ListNoParam loaded = new ListNoParam().load(target);
+        assertEquals(Arrays.asList(2, 4), loaded.key);
+    }
+
+    @Test
     void testCannotAssignNullToDouble() throws IOException {
         new Primitive().save(target);
         replaceInTarget("double: 1.0", "");

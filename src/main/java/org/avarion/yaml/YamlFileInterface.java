@@ -3,6 +3,7 @@ package org.avarion.yaml;
 import org.avarion.yaml.exceptions.DuplicateKey;
 import org.avarion.yaml.exceptions.FinalAttribute;
 import org.avarion.yaml.exceptions.YamlException;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.yaml.snakeyaml.DumperOptions;
@@ -32,11 +33,11 @@ public abstract class YamlFileInterface {
         yaml = new Yaml(representer, options);
     }
 
-    private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value) throws IOException {
-        return getConvertedValue(field, field.getType(), value);
+    private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value, boolean isLenient) throws IOException {
+        return getConvertedValue(field, field.getType(), value, isLenient);
     }
 
-    private static @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value)
+    private static @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value, boolean isLenient)
             throws IOException {
         if (value==null) {
             return handleNullValue(expectedType, field);
@@ -47,7 +48,7 @@ public abstract class YamlFileInterface {
         }
 
         if (value instanceof List<?>) {
-            return handleListValue(field, expectedType, (List<?>) value);
+            return handleListValue(field, expectedType, (List<?>) value, isLenient);
         }
 
         if (expectedType.isInstance(value)) {
@@ -59,11 +60,11 @@ public abstract class YamlFileInterface {
         }
 
         if (Number.class.isAssignableFrom(value.getClass())) {
-            return convertToNumber((Number) value, expectedType);
+            return convertToNumber((Number) value, expectedType, isLenient);
         }
 
         if (isCharacterType(expectedType)) {
-            return convertToCharacter(String.valueOf(value));
+            return convertToCharacter(String.valueOf(value), isLenient);
         }
 
         // For other classes, attempt to use their constructor that takes a String parameter
@@ -82,7 +83,7 @@ public abstract class YamlFileInterface {
         return null;
     }
 
-    private static @NotNull Object handleListValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final List<?> list) throws IOException {
+    private static @NotNull Object handleListValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final List<?> list, boolean isLenient) throws IOException {
         if (!List.class.isAssignableFrom(expectedType)) {
             throw new IOException("Expected a List, but got " + expectedType.getSimpleName());
         }
@@ -103,7 +104,7 @@ public abstract class YamlFileInterface {
 
         List<Object> result = new ArrayList<>();
         for (Object item : list) {
-            Object convertedValue = getConvertedValue(null, elementType, item);
+            Object convertedValue = getConvertedValue(null, elementType, item, isLenient);
             result.add(convertedValue);
         }
         return result;
@@ -122,7 +123,7 @@ public abstract class YamlFileInterface {
         return TRUE_VALUES.contains(strValue);
     }
 
-    private static Object convertToNumber(final Number numValue, final Class<?> expectedType) throws IOException {
+    private static Object convertToNumber(final Number numValue, final Class<?> expectedType, boolean isLenient) throws IOException {
         if (expectedType==int.class || expectedType==Integer.class) {
             return numValue.intValue();
         }
@@ -130,7 +131,7 @@ public abstract class YamlFileInterface {
             return numValue.doubleValue();
         }
         if (expectedType==float.class || expectedType==Float.class) {
-            return convertToFloat(numValue);
+            return convertToFloat(numValue, isLenient);
         }
         if (expectedType==long.class || expectedType==Long.class) {
             return numValue.longValue();
@@ -144,9 +145,9 @@ public abstract class YamlFileInterface {
         throw new IOException("Cannot convert " + numValue.getClass().getSimpleName() + " to " + expectedType.getSimpleName());
     }
 
-    private static float convertToFloat(final @NotNull Number numValue) throws IOException {
+    private static float convertToFloat(final @NotNull Number numValue, boolean isLenient) throws IOException {
         double doubleValue = numValue.doubleValue();
-        if (Math.abs(doubleValue - (float) doubleValue) >= 1e-9) {
+        if (!isLenient && Math.abs(doubleValue - (float) doubleValue) >= 1e-9) {
             throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
         }
         return numValue.floatValue();
@@ -156,8 +157,8 @@ public abstract class YamlFileInterface {
         return type==char.class || type==Character.class;
     }
 
-    private static @NotNull Character convertToCharacter(final @NotNull String value) throws IOException {
-        if (value.length()==1) {
+    private static @NotNull Character convertToCharacter(final @NotNull String value, boolean isLenient) throws IOException {
+        if (value.length()==1 || isLenient) {
             return value.charAt(0);
         }
 
@@ -194,15 +195,19 @@ public abstract class YamlFileInterface {
             data = (Map<String, Object>) yml.load(inputStream);
         }
 
+        Class<?> clazz = this.getClass();
+        YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
+        boolean isLenientByDefault = yamlFileAnnotation!=null && yamlFileAnnotation.lenient() == Leniency.LENIENT;
+
         try {
-            loadFields(data);
+            loadFields(data, isLenientByDefault);
         } catch (IllegalAccessException | IllegalArgumentException | NullPointerException | FinalAttribute e) {
             throw new IOException(e);
         }
         return (T) this;
     }
 
-    private void loadFields(Map<String, Object> data) throws FinalAttribute, IllegalAccessException, IOException {
+    private void loadFields(Map<String, Object> data, boolean isLenientByDefault) throws FinalAttribute, IllegalAccessException, IOException {
         if (data==null) {
             data = new HashMap<>();
         }
@@ -217,7 +222,7 @@ public abstract class YamlFileInterface {
                 }
 
                 if (keyAnnotation!=null && !keyAnnotation.value().trim().isEmpty()) {
-                    readYamlKeyField(data, field, keyAnnotation);
+                    readYamlKeyField(data, field, keyAnnotation, isLenientByDefault);
                 }
                 else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
                     readYamlMapField(data, field, mapAnnotation);
@@ -413,20 +418,34 @@ public abstract class YamlFileInterface {
         save(new File(target));
     }
 
-    private void readYamlKeyField(Map<String, Object> data, @NotNull Field field, YamlKey annotation)
+    private void readYamlKeyField(Map<String, Object> data, @NotNull Field field, @NotNull YamlKey annotation, boolean isLenientByDefault)
             throws FinalAttribute, IllegalAccessException, IOException {
         if (Modifier.isFinal(field.getModifiers())) {
             throw new FinalAttribute(field.getName());
         }
 
         String key = annotation.value();
+        boolean isLenient = isLenient(annotation.lenient(), isLenientByDefault);
+
         Object value = getNestedValue(data, key.split("\\."));
         if (value!=UNKNOWN) {
-            field.set(this, getConvertedValue(field, value));
+            field.set(this, getConvertedValue(field, value, isLenient));
         }
     }
 
-    private void readYamlMapField(Map<String, Object> data, @NotNull Field field, YamlMap annotation) throws IllegalAccessException, FinalAttribute {
+    @Contract(pure = true)
+    private static boolean isLenient(@NotNull Leniency leniency, boolean isLenientByDefault) {
+        switch (leniency) {
+            case LENIENT:
+                return true;
+            case UNDEFINED:
+                return isLenientByDefault;
+            default:
+                return false;
+        }
+    }
+
+    private void readYamlMapField(Map<String, Object> data, @NotNull Field field, @NotNull YamlMap annotation) throws IllegalAccessException, FinalAttribute {
         if (Modifier.isFinal(field.getModifiers())) {
             throw new FinalAttribute(field.getName());
         }

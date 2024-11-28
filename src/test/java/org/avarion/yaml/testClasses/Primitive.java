@@ -23,3 +23,4 @@ public class Primitive extends YamlFileInterface {
     @YamlKey("boolean")
     public boolean bln = true;
 }
+
