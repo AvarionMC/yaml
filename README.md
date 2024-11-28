@@ -16,7 +16,9 @@ import org.avarion.yaml.YamlKey;
 
 @YamlFile(header = """
 		This is some text that will appear at the top of the file.
-		""")
+		""",
+        lenient = Leniency.LENIENT // default is STRICT
+)
 public class Settings extends YamlFileInterface {
 	@YamlComment("Some comment describing `param1`")
 	@YamlKey("param1")
@@ -43,7 +45,10 @@ public class Settings extends YamlFileInterface {
 	public String subString = "abc";
 
 	@YamlComment("Demonstration of sub-sections -- float")
-	@YamlKey("sub.float")
+	@YamlKey(
+            value="sub.float",
+            lenient = Leniency.LENIENT  // default is inherited or STRICT
+    ) 
 	public float subFloat = 0.0;
 
 	@YamlComment("Demonstration of sub-sections -- double")
@@ -92,3 +97,14 @@ sub:
 ## Import
 
 [Follow the instructions here](https://jitpack.io/#AvarionMC/yaml)
+
+## Leniency
+Leniency can be one of `UNDEFINED`, `STRICT` or `LENIENT`
+
+- The default for the `YamlFile` is `STRICT`.
+- The default for `YamlKey` is inherited from `YamlFile`.
+
+What does this mean?
+- If you define a field as char, and a string is given. In `STRICT` mode, it will give an error. In `LENIENT` mode it just takes the first character, discarding the rest.
+- If you define a field as a float, and pass in for example 0.51, this is actually 0.50999999... So not exactly the same. In `LENIENT` mode no error will be given, but in `STRICT` mode it will throw an exception.
+
