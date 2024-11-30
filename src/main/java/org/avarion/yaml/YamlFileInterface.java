@@ -5,10 +5,11 @@ import org.avarion.yaml.exceptions.FinalAttribute;
 import org.avarion.yaml.exceptions.YamlException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -19,18 +20,8 @@ import java.util.*;
 @SuppressWarnings("unchecked")
 public abstract class YamlFileInterface {
     static final Object UNKNOWN = new Object();
-    private static final Yaml yaml;
+    private static final YamlWrapper yaml = YamlWrapperFactory.create();
     private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
-
-    static {
-        ToStringRepresenter representer = new ToStringRepresenter();
-
-        DumperOptions options = new org.yaml.snakeyaml.DumperOptions();
-        options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
-        options.setPrettyFlow(true);
-
-        yaml = new Yaml(representer, options);
-    }
 
     private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value) throws IOException {
         return getConvertedValue(field, field.getType(), value);
@@ -187,12 +178,12 @@ public abstract class YamlFileInterface {
             return (T) this;
         }
 
-        Yaml yml = new Yaml();
-        Map<String, Object> data;
-
+        String content;
         try (FileInputStream inputStream = new FileInputStream(file)) {
-            data = (Map<String, Object>) yml.load(inputStream);
+            content = new String(inputStream.readAllBytes());
         }
+
+        Map<String, Object> data = (Map<String, Object>) yaml.load(content);
 
         try {
             loadFields(data);
@@ -273,19 +264,19 @@ public abstract class YamlFileInterface {
     }
 
     private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey {
-        NestedMap nestedMap = new NestedMap();
 
-        Class<?> clazz = this.getClass();
-
-        // 1. file header
         StringBuilder result = new StringBuilder();
+
+        // Get YAML file header if present
+        Class<?> clazz = this.getClass();
         YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
         if (yamlFileAnnotation!=null && !yamlFileAnnotation.header().trim().isEmpty()) {
             splitAndAppend(result, yamlFileAnnotation.header(), "", "# ");
-            result.append("\n");  // Empty line after the header
+            result.append("\n");
         }
 
-        // 2. fields
+        // Fields
+        NestedMap nestedMap = new NestedMap();
         for (Field field : clazz.getDeclaredFields()) {
             YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
             YamlMap mapAnnotation = field.getAnnotation(YamlMap.class);
@@ -362,9 +353,7 @@ public abstract class YamlFileInterface {
     }
 
     private @NotNull String formatValue(final Object value) {
-        StringWriter writer = new StringWriter();
-        yaml.dump(value, writer);
-        String yamlContent = writer.toString().trim();
+        String yamlContent = yaml.dump(value).trim();
 
         if (value instanceof Enum) {
             // Remove the tag in the yaml
