@@ -102,6 +102,7 @@ jacocoTestReport {
 
 sonar {
     properties {
+        property "sonar.scm.disabled", "true"
         property "sonar.projectKey", "AvarionMC_yaml"
         property "sonar.organization", "avarionmc"
         property "sonar.host.url", "https://sonarcloud.io"
