@@ -1,5 +1,6 @@
-package org.avarion.yaml;
+package org.avarion.yaml.v2;
 
+import org.avarion.yaml.YamlWrapper;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
