@@ -107,7 +107,8 @@ sonar {
         property "sonar.sources", "src/main"
         property "sonar.tests", "src/test"
         property "sonar.verbose", "true"
-        property "sonar.log.level", "DEBUG"
+
+        property "sonar.cpd.exclusions", "**/YamlWrapperImpl.java"
 
         property "sonar.projectKey", "AvarionMC_yaml"
         property "sonar.organization", "avarionmc"
