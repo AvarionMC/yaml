@@ -48,13 +48,17 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean jar --info
 
-      - name: Run tests
+      - name: Run tests for 1.14
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          ./gradlew test sonar --info
-          ./gradlew test sonar --info -PsnakeYamlVersion=2.2
+        run: ./gradlew test sonar --info -PsnakeYamlVersion=1.14
+
+      - name: Run tests for 2.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: ./gradlew test sonar --info -PsnakeYamlVersion=2.2
 
       - name: list all
         run: find . -type f -name \*.xml
