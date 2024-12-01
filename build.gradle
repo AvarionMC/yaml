@@ -2,15 +2,54 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id "jacoco"
-    id "org.sonarqube" version "6.0.0.5145"
+    id "org.sonarqube" version "5.1.0.4882"
 }
+
+
+def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
+def isV1 = snakeYamlVersion.startsWith('1.')
+
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_9
     targetCompatibility = JavaVersion.VERSION_1_9
 }
 
-tasks.withType(JavaCompile).configureEach { // both compileJave & compileTestJava
+
+sourceSets {
+    main.java.srcDirs = []
+    common.java.srcDir 'src/main/java'
+    v1 {
+        java.srcDir 'src/main/java-v1'
+        compileClasspath += sourceSets.common.output
+    }
+    v2 {
+        java.srcDir 'src/main/java-v2'
+        compileClasspath += sourceSets.common.output
+    }
+    test {
+        java.srcDir 'src/test/java'
+
+        compileClasspath += sourceSets.common.output
+        compileClasspath += sourceSets.v1.output
+        compileClasspath += sourceSets.v2.output
+
+        runtimeClasspath += sourceSets.common.output
+        runtimeClasspath += sourceSets.v1.output
+        runtimeClasspath += sourceSets.v2.output
+    }
+}
+
+configurations {
+    commonImplementation
+    v1Implementation.extendsFrom commonImplementation
+    v2Implementation.extendsFrom commonImplementation
+    v1CompileOnly
+    v2CompileOnly
+    testImplementation
+}
+
+tasks.withType(JavaCompile).configureEach {
     options.compilerArgs += ["-Xlint:deprecation", "-Xlint:-options"]
     options.encoding = 'UTF-8'
 }
@@ -20,59 +59,64 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'org.yaml:snakeyaml:1.14'
-    compileOnly 'org.jetbrains:annotations:26.0.1'
+    v1CompileOnly 'org.yaml:snakeyaml:1.14'
+    v2CompileOnly 'org.yaml:snakeyaml:2.2'
 
-    testRuntimeOnly 'org.yaml:snakeyaml:1.14'
+    runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
+    testRuntimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
+
+    commonImplementation 'org.jetbrains:annotations:26.0.1'
+
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.3'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.11.3'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testImplementation 'org.jetbrains:annotations:26.0.1'
 }
+
+jar {
+    from sourceSets.common.output
+    from sourceSets.v1.output
+    from sourceSets.v2.output
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 
 test {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
 }
 
-sourceSets {
-    test {
-        java {
-            srcDirs = ['src/test/java']
+
+jacocoTestReport {
+    reports {
+        xml {
+            required = true
+            outputLocation = layout.buildDirectory.file('reports/jacoco/report-' + snakeYamlVersion + '.xml')
         }
+        html.required = true
     }
+    sourceDirectories = files(sourceSets.common.allJava.srcDirs, isV1 ? sourceSets.v1.allJava.srcDirs : sourceSets.v2.allJava.srcDirs)
+    classDirectories = files(sourceSets.common.output, isV1 ? sourceSets.v1.output : sourceSets.v2.output)
 }
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            groupId = project.group
-            artifactId = project.name
-            version = project.version
-        }
-    }
-    repositories {
-        mavenLocal()
-    }
-}
 
 sonar {
     properties {
+        property "sonar.scm.disabled", "true"
+        property "sonar.java.binaries", "${layout.buildDirectory.get()}/classes"
+        property "sonar.sources", "src/main"
+        property "sonar.tests", "src/test"
+        property "sonar.verbose", "true"
+
+        property "sonar.cpd.exclusions", "**/YamlWrapperImpl.java"
+
         property "sonar.projectKey", "AvarionMC_yaml"
         property "sonar.organization", "avarionmc"
         property "sonar.host.url", "https://sonarcloud.io"
-    }
-}
-
-
-test {
-    finalizedBy jacocoTestReport // report is always generated after tests run
-}
-jacocoTestReport {
-    dependsOn test // tests are required to run before generating the report
-
-    reports {
-        xml.required = true
+        property 'sonar.core.codeCoveragePlugin', 'jacoco'
+        property "sonar.coverage.jacoco.xmlReportPaths", [
+                "${layout.buildDirectory.get()}/reports/jacoco/report-1.14.xml",
+                "${layout.buildDirectory.get()}/reports/jacoco/report-2.2.xml"
+        ].join(',')
     }
 }

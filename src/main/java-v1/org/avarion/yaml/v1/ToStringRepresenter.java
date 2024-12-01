@@ -1,4 +1,4 @@
-package org.avarion.yaml;
+package org.avarion.yaml.v1;
 
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.nodes.Node;
@@ -7,7 +7,7 @@ import org.yaml.snakeyaml.nodes.Tag;
 import org.yaml.snakeyaml.representer.Represent;
 import org.yaml.snakeyaml.representer.Representer;
 
-class ToStringRepresenter extends Representer {
+public class ToStringRepresenter extends Representer {
     public ToStringRepresenter() {
         super();
         this.representers.put(null, new RepresentFallback());
