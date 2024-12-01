@@ -15,32 +15,20 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_9
 }
 
+
 sourceSets {
-    main {
-        java.srcDirs = []
-        resources.srcDirs = []
-    }
-    common {
-        java {
-            srcDir 'src/main/java'
-        }
-    }
+    main.java.srcDirs = []
+    common.java.srcDir 'src/main/java'
     v1 {
-        java {
-            srcDir 'src/main/java-v1'
-        }
+        java.srcDir 'src/main/java-v1'
         compileClasspath += sourceSets.common.output
     }
     v2 {
-        java {
-            srcDir 'src/main/java-v2'
-        }
+        java.srcDir 'src/main/java-v2'
         compileClasspath += sourceSets.common.output
     }
     test {
-        java {
-            srcDirs = ['src/test/java']
-        }
+        java.srcDir 'src/test/java'
 
         compileClasspath += sourceSets.common.output
         compileClasspath += sourceSets.v1.output
@@ -79,10 +67,6 @@ dependencies {
 
     commonImplementation 'org.jetbrains:annotations:26.0.1'
 
-    testImplementation sourceSets.common.output
-    testImplementation sourceSets.v1.output
-    testImplementation sourceSets.v2.output
-
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.3'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.11.3'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.11.3'
@@ -96,31 +80,22 @@ jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-test {
-    dependsOn sourceSets.v1.output, sourceSets.v2.output
 
+test {
     useJUnitPlatform()
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
     finalizedBy jacocoTestReport
 }
 
+
 jacocoTestReport {
-    dependsOn test
     reports {
         xml.required = true
         html.required = true
     }
-
-    sourceDirectories.setFrom files(
-            sourceSets.common.allJava.srcDirs,
-            isV1 ? sourceSets.v1.allJava.srcDirs : sourceSets.v2.allJava.srcDirs
-    )
-    classDirectories.setFrom files(
-            sourceSets.common.output,
-            isV1 ? sourceSets.v1.output : sourceSets.v2.output
-    )
+    sourceDirectories = files(sourceSets.common.allJava.srcDirs, isV1 ? sourceSets.v1.allJava.srcDirs : sourceSets.v2.allJava.srcDirs)
+    classDirectories = files(sourceSets.common.output, isV1 ? sourceSets.v1.output : sourceSets.v2.output)
 }
+
 
 sonar {
     properties {
