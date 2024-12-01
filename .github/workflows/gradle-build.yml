@@ -55,3 +55,6 @@ jobs:
         run: |
           ./gradlew test sonar --info
           ./gradlew test sonar --info -PsnakeYamlVersion=2.2
+
+      - name: list all
+        run: find . -type f -name \*.xml
