@@ -36,9 +36,11 @@ sourceSets {
         java {
             srcDirs = ['src/test/java']
         }
+        compileClasspath = configurations.testCompileClasspath
         compileClasspath += sourceSets.common.output
         compileClasspath += sourceSets.v1.output
         compileClasspath += sourceSets.v2.output
+        runtimeClasspath = configurations.testRuntimeClasspath
         runtimeClasspath += sourceSets.common.output
         runtimeClasspath += sourceSets.v1.output
         runtimeClasspath += sourceSets.v2.output
@@ -80,17 +82,31 @@ jar {
 }
 
 tasks.register('testV1', Test) {
-    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = configurations.testRuntimeClasspath +
+            sourceSets.test.output +
+            sourceSets.common.output +
+            sourceSets.v1.output +
+            sourceSets.v2.output
     dependencies {
         testRuntimeOnly 'org.yaml:snakeyaml:1.14'
     }
+    finalizedBy jacocoTestReport
 }
 
 tasks.register('testV2', Test) {
-    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = configurations.testRuntimeClasspath +
+            sourceSets.test.output +
+            sourceSets.common.output +
+            sourceSets.v1.output +
+            sourceSets.v2.output
     dependencies {
         testRuntimeOnly 'org.yaml:snakeyaml:2.2'
     }
+    finalizedBy jacocoTestReport
 }
 
 tasks.register('testBoth') {
