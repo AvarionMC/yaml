@@ -10,6 +10,7 @@ import java.util.Map;
 @Target({ElementType.FIELD})
 public @interface YamlMap {
     String value();
+    Leniency lenient() default Leniency.UNDEFINED;
 
     Class<? extends YamlMapProcessor<? extends YamlFileInterface>> processor();
 
