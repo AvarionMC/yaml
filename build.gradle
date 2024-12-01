@@ -84,17 +84,20 @@ jar {
 tasks.register('testV1', Test) {
     useJUnitPlatform()
     testClassesDirs = sourceSets.test.output.classesDirs
+    def testV1Config = configurations.create("testV1Runtime")
     classpath = configurations.testRuntimeClasspath +
             sourceSets.test.output +
             sourceSets.common.output +
             sourceSets.v1.output +
-            sourceSets.v2.output
-    dependencies {
-        testRuntimeOnly 'org.yaml:snakeyaml:1.14'
+            sourceSets.v2.output +
+            testV1Config
+    configurations {
+        testV1Runtime
     }
-    finalizedBy jacocoTestReport
+    dependencies {
+        testV1Runtime 'org.yaml:snakeyaml:1.14'
+    }
 }
-
 tasks.register('testV2', Test) {
     useJUnitPlatform()
     testClassesDirs = sourceSets.test.output.classesDirs
@@ -106,30 +109,38 @@ tasks.register('testV2', Test) {
     dependencies {
         testRuntimeOnly 'org.yaml:snakeyaml:2.2'
     }
-    finalizedBy jacocoTestReport
 }
 
-tasks.register('testBoth') {
-    dependsOn testV1, testV2
+jacocoTestReport {
+    dependsOn test
+    executionData.setFrom(fileTree(project.buildDir).include("jacoco/*.exec"))
+
+    sourceDirectories.setFrom files(
+            sourceSets.common.allJava.srcDirs,
+            sourceSets.v1.allJava.srcDirs,
+            sourceSets.v2.allJava.srcDirs
+    )
+    classDirectories.setFrom files(
+            sourceSets.common.output,
+            sourceSets.v1.output,
+            sourceSets.v2.output
+    )
 }
 
 test {
     useJUnitPlatform()
-    finalizedBy jacocoTestReport
-}
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            groupId = project.group
-            artifactId = project.name
-            version = project.version
-        }
+    doFirst {
+        // Clean existing exec data
+        delete fileTree(dir: project.buildDir, includes: ['jacoco/*.exec'])
     }
-    repositories {
-        mavenLocal()
-    }
+
+    dependsOn testV1, testV2
+
+    // Skip actual test execution since we ran them in v1/v2
+    enabled = false
+
+    finalizedBy jacocoTestReport
 }
 
 sonar {
@@ -137,12 +148,5 @@ sonar {
         property "sonar.projectKey", "AvarionMC_yaml"
         property "sonar.organization", "avarionmc"
         property "sonar.host.url", "https://sonarcloud.io"
-    }
-}
-
-jacocoTestReport {
-    dependsOn test
-    reports {
-        xml.required = true
     }
 }
