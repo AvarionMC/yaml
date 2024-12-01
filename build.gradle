@@ -5,6 +5,11 @@ plugins {
     id "org.sonarqube" version "5.1.0.4882"
 }
 
+
+def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
+def isV1 = snakeYamlVersion.startsWith('1.')
+
+
 java {
     sourceCompatibility = JavaVersion.VERSION_1_9
     targetCompatibility = JavaVersion.VERSION_1_9
@@ -36,11 +41,11 @@ sourceSets {
         java {
             srcDirs = ['src/test/java']
         }
-        compileClasspath = configurations.testCompileClasspath
+
         compileClasspath += sourceSets.common.output
         compileClasspath += sourceSets.v1.output
         compileClasspath += sourceSets.v2.output
-        runtimeClasspath = configurations.testRuntimeClasspath
+
         runtimeClasspath += sourceSets.common.output
         runtimeClasspath += sourceSets.v1.output
         runtimeClasspath += sourceSets.v2.output
@@ -51,6 +56,9 @@ configurations {
     commonImplementation
     v1Implementation.extendsFrom commonImplementation
     v2Implementation.extendsFrom commonImplementation
+    v1CompileOnly
+    v2CompileOnly
+    testImplementation
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -63,10 +71,17 @@ repositories {
 }
 
 dependencies {
+    v1CompileOnly 'org.yaml:snakeyaml:1.14'
+    v2CompileOnly 'org.yaml:snakeyaml:2.2'
+
+    runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
+    testRuntimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
+
     commonImplementation 'org.jetbrains:annotations:26.0.1'
 
-    v1Implementation 'org.yaml:snakeyaml:1.14'
-    v2Implementation 'org.yaml:snakeyaml:2.2'
+    testImplementation sourceSets.common.output
+    testImplementation sourceSets.v1.output
+    testImplementation sourceSets.v2.output
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.3'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.11.3'
@@ -81,66 +96,30 @@ jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-tasks.register('testV1', Test) {
+test {
+    dependsOn sourceSets.v1.output, sourceSets.v2.output
+
     useJUnitPlatform()
     testClassesDirs = sourceSets.test.output.classesDirs
-    def testV1Config = configurations.create("testV1Runtime")
-    classpath = configurations.testRuntimeClasspath +
-            sourceSets.test.output +
-            sourceSets.common.output +
-            sourceSets.v1.output +
-            sourceSets.v2.output +
-            testV1Config
-    configurations {
-        testV1Runtime
-    }
-    dependencies {
-        testV1Runtime 'org.yaml:snakeyaml:1.14'
-    }
-}
-tasks.register('testV2', Test) {
-    useJUnitPlatform()
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = configurations.testRuntimeClasspath +
-            sourceSets.test.output +
-            sourceSets.common.output +
-            sourceSets.v1.output +
-            sourceSets.v2.output
-    dependencies {
-        testRuntimeOnly 'org.yaml:snakeyaml:2.2'
-    }
+    classpath = sourceSets.test.runtimeClasspath
+    finalizedBy jacocoTestReport
 }
 
 jacocoTestReport {
     dependsOn test
-    executionData.setFrom(fileTree(project.buildDir).include("jacoco/*.exec"))
+    reports {
+        xml.required = true
+        html.required = true
+    }
 
     sourceDirectories.setFrom files(
             sourceSets.common.allJava.srcDirs,
-            sourceSets.v1.allJava.srcDirs,
-            sourceSets.v2.allJava.srcDirs
+            isV1 ? sourceSets.v1.allJava.srcDirs : sourceSets.v2.allJava.srcDirs
     )
     classDirectories.setFrom files(
             sourceSets.common.output,
-            sourceSets.v1.output,
-            sourceSets.v2.output
+            isV1 ? sourceSets.v1.output : sourceSets.v2.output
     )
-}
-
-test {
-    useJUnitPlatform()
-
-    doFirst {
-        // Clean existing exec data
-        delete fileTree(dir: project.buildDir, includes: ['jacoco/*.exec'])
-    }
-
-    dependsOn testV1, testV2
-
-    // Skip actual test execution since we ran them in v1/v2
-    enabled = false
-
-    finalizedBy jacocoTestReport
 }
 
 sonar {
@@ -149,4 +128,19 @@ sonar {
         property "sonar.organization", "avarionmc"
         property "sonar.host.url", "https://sonarcloud.io"
     }
+}
+
+tasks.withType(Test) {
+    testLogging {
+        events "passed", "skipped", "failed", "standardOut", "standardError"
+        exceptionFormat "full"
+        showExceptions true
+        showCauses true
+        showStackTraces true
+    }
+}
+
+test.doFirst {
+    println "Test classpath:"
+    test.classpath.each { println it }
 }
