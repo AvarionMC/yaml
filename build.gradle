@@ -103,18 +103,19 @@ jacocoTestReport {
 sonar {
     properties {
         property "sonar.scm.disabled", "true"
-        property "sonar.java.binaries", "${buildDir}/classes"
+        property "sonar.java.binaries", "${layout.buildDirectory.get()}/classes"
         property "sonar.sources", "src/main"
         property "sonar.tests", "src/test"
         property "sonar.verbose", "true"
+        property "sonar.log.level", "DEBUG"
 
         property "sonar.projectKey", "AvarionMC_yaml"
         property "sonar.organization", "avarionmc"
         property "sonar.host.url", "https://sonarcloud.io"
         property 'sonar.core.codeCoveragePlugin', 'jacoco'
         property "sonar.coverage.jacoco.xmlReportPaths", [
-                "${buildDir}/reports/jacoco/report-1.14.xml",
-                "${buildDir}/reports/jacoco/report-2.2.xml"
+                "${layout.buildDirectory.get()}/reports/jacoco/report-1.14.xml",
+                "${layout.buildDirectory.get()}/reports/jacoco/report-2.2.xml"
         ].join(',')
     }
 }
