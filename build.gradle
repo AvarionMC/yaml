@@ -100,6 +100,22 @@ jacocoTestReport {
 }
 
 
+// This is necessary for jitpack.io!
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId = project.group
+            artifactId = project.name
+            version = project.version
+        }
+    }
+    repositories {
+        mavenLocal()
+    }
+}
+
+
 sonar {
     properties {
         property "sonar.scm.disabled", "true"
