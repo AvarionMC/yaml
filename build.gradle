@@ -103,6 +103,11 @@ jacocoTestReport {
 sonar {
     properties {
         property "sonar.scm.disabled", "true"
+        property "sonar.java.binaries", "${buildDir}/classes"
+        property "sonar.sources", "src/main"
+        property "sonar.tests", "src/test"
+        property "sonar.verbose", "true"
+
         property "sonar.projectKey", "AvarionMC_yaml"
         property "sonar.organization", "avarionmc"
         property "sonar.host.url", "https://sonarcloud.io"
