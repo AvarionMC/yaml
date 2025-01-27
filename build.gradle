@@ -65,7 +65,7 @@ dependencies {
     runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
     testRuntimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
 
-    commonImplementation 'org.jetbrains:annotations:26.0.1'
+    commonImplementation 'org.jetbrains:annotations:26.0.2'
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.11.4'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.11.4'
