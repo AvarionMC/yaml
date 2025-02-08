@@ -438,7 +438,7 @@ class YamlFileInterfaceTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new Primitive().load(target.toString());
         });
-        assertEquals("Expected a List, but got char", thrown.getMessage());
+        assertEquals("Expected a Collection, but got char", thrown.getMessage());
     }
 
     @Test

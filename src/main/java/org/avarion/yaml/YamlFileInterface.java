@@ -39,7 +39,7 @@ public abstract class YamlFileInterface {
             return stringToEnum((Class<? extends Enum>) expectedType, (String) value);
         }
 
-        if (value instanceof List<?> || value instanceof Set<?>) {
+        if (value instanceof List<?>) {
             return handleCollectionValue(field, expectedType, (Collection<?>) value, isLenient);
         }
 
@@ -89,18 +89,12 @@ public abstract class YamlFileInterface {
             throw new IOException("Expected a Collection, but got " + expectedType.getSimpleName());
         }
 
-        Class<?> elementType;
+        Class<?> elementType = Object.class;
         if (field!=null) {
             Type genericType = field.getGenericType();
             if (genericType instanceof ParameterizedType) {
                 elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
             }
-            else {
-                elementType = Object.class;
-            }
-        }
-        else {
-            elementType = Object.class;
         }
 
         Collection<Object> result;
@@ -383,7 +377,7 @@ public abstract class YamlFileInterface {
     private @NotNull String formatValue(final Object value) {
         String yamlContent = yaml.dump(value).trim();
 
-        if (value instanceof Enum) {
+        if (value instanceof Enum || value instanceof UUID) {
             // Remove the tag in the yaml
             // !!org.avarion.yaml.Material 'A' --> 'A'
             yamlContent = yamlContent.replaceAll("^!!\\S+\\s+", "");
