@@ -85,17 +85,6 @@ public abstract class YamlFileInterface {
 
     private static @NotNull Object handleCollectionValue(
             final @Nullable Field field, final @NotNull Class<?> expectedType, final Collection<?> collection, boolean isLenient) throws IOException {
-        if (!Collection.class.isAssignableFrom(expectedType)) {
-            throw new IOException("Expected a Collection, but got " + expectedType.getSimpleName());
-        }
-
-        Class<?> elementType = Object.class;
-        if (field!=null) {
-            Type genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType) {
-                elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
-            }
-        }
 
         Collection<Object> result;
         if (Set.class.isAssignableFrom(expectedType)) {
@@ -106,6 +95,14 @@ public abstract class YamlFileInterface {
         }
         else {
             throw new IOException("Unsupported collection type: " + expectedType.getSimpleName());
+        }
+
+        Class<?> elementType = Object.class;
+        if (field!=null) {
+            Type genericType = field.getGenericType();
+            if (genericType instanceof ParameterizedType) {
+                elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
+            }
         }
 
         for (Object item : collection) {
