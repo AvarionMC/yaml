@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -369,6 +371,20 @@ class YamlFileInterfaceTest extends TestCommon {
     }
 
     @Test
+    void testSetAsInts() throws IOException {
+        SetYmlInt file = new SetYmlInt();
+        file.key = Set.of(2, 3);
+        assertEquals(Set.of(2, 3), file.key);
+
+        file.save(target);
+
+        replaceInTarget("3", "4");
+
+        SetYmlInt loaded = new SetYmlInt().load(target);
+        assertEquals(Set.of(2, 4), loaded.key);
+    }
+
+    @Test
     void testListWithoutType() throws IOException {
 
         ListNoParam file = new ListNoParam();
@@ -422,7 +438,16 @@ class YamlFileInterfaceTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new Primitive().load(target.toString());
         });
-        assertEquals("Expected a List, but got char", thrown.getMessage());
+        assertEquals("Unsupported collection type: char", thrown.getMessage());
+    }
+
+    @Test
+    void testUUIDConversion() throws IOException {
+        new LoadingUUIDs().save(target);
+
+        replaceInTarget("3", "9");
+
+        LoadingUUIDs loaded = new LoadingUUIDs().load(target);
+        assertEquals(Set.of(UUID.fromString("11111111-2222-9999-4444-555555555555")), loaded.key);
     }
 }
-

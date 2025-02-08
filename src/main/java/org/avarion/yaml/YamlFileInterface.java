@@ -13,6 +13,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Abstract class providing utility methods to handle YAML files, including
@@ -39,11 +40,15 @@ public abstract class YamlFileInterface {
         }
 
         if (value instanceof List<?>) {
-            return handleListValue(field, expectedType, (List<?>) value, isLenient);
+            return handleCollectionValue(field, expectedType, (Collection<?>) value, isLenient);
         }
 
         if (expectedType.isInstance(value)) {
             return value;
+        }
+
+        if (value instanceof String && expectedType.equals(UUID.class)) {
+            return UUID.fromString((String) value);
         }
 
         if (isBooleanType(expectedType)) {
@@ -70,7 +75,7 @@ public abstract class YamlFileInterface {
     private static @Nullable Object handleNullValue(final @NotNull Class<?> expectedType, final Field field) throws IOException {
         if (expectedType.isPrimitive()) {
             String message = "Cannot assign null to primitive type " + expectedType.getSimpleName();
-            if (field != null) {
+            if (field!=null) {
                 message += " (field: " + field.getName() + ")";
             }
             throw new IOException(message);
@@ -78,27 +83,29 @@ public abstract class YamlFileInterface {
         return null;
     }
 
-    private static @NotNull Object handleListValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final List<?> list, boolean isLenient) throws IOException {
-        if (!List.class.isAssignableFrom(expectedType)) {
-            throw new IOException("Expected a List, but got " + expectedType.getSimpleName());
+    private static @NotNull Object handleCollectionValue(
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final Collection<?> collection, boolean isLenient) throws IOException {
+
+        Collection<Object> result;
+        if (Set.class.isAssignableFrom(expectedType)) {
+            result = new LinkedHashSet<>();
+        }
+        else if (List.class.isAssignableFrom(expectedType)) {
+            result = new ArrayList<>();
+        }
+        else {
+            throw new IOException("Unsupported collection type: " + expectedType.getSimpleName());
         }
 
-        Class<?> elementType;
+        Class<?> elementType = Object.class;
         if (field!=null) {
             Type genericType = field.getGenericType();
             if (genericType instanceof ParameterizedType) {
                 elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
             }
-            else {
-                elementType = Object.class;
-            }
-        }
-        else {
-            elementType = Object.class;
         }
 
-        List<Object> result = new ArrayList<>();
-        for (Object item : list) {
+        for (Object item : collection) {
             Object convertedValue = getConvertedValue(null, elementType, item, isLenient);
             result.add(convertedValue);
         }
@@ -173,9 +180,9 @@ public abstract class YamlFileInterface {
      * @throws IOException If there's an error reading the file or parsing the YAML content.
      *
      *                     <pre>{@code
-     *                     MyConfig config = new MyConfig();
-     *                     config.load(new File("config.yml"));
-     *                     }</pre>
+     *                                                             MyConfig config = new MyConfig();
+     *                                                             config.load(new File("config.yml"));
+     *                                                             }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
         if (!file.exists()) {
@@ -192,7 +199,7 @@ public abstract class YamlFileInterface {
 
         Class<?> clazz = this.getClass();
         YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
-        boolean isLenientByDefault = yamlFileAnnotation!=null && yamlFileAnnotation.lenient() == Leniency.LENIENT;
+        boolean isLenientByDefault = yamlFileAnnotation!=null && yamlFileAnnotation.lenient()==Leniency.LENIENT;
 
         try {
             loadFields(data, isLenientByDefault);
@@ -311,9 +318,7 @@ public abstract class YamlFileInterface {
         return result.toString();
     }
 
-    private void splitAndAppend(
-            final @NotNull StringBuilder yaml, final @Nullable String data, final @NotNull String indentStr, final @NotNull String extra
-    ) {
+    private void splitAndAppend(final @NotNull StringBuilder yaml, final @Nullable String data, final @NotNull String indentStr, final @NotNull String extra) {
         if (data==null) {
             return;
         }
@@ -323,9 +328,7 @@ public abstract class YamlFileInterface {
         }
     }
 
-    private void convertNestedMapToYaml(
-            final StringBuilder yaml, final @NotNull Map<String, Object> map, final int indent
-    ) {
+    private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<String, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
             tmp.append("  ");
@@ -354,6 +357,13 @@ public abstract class YamlFileInterface {
                     splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
                 }
             }
+            else if (value instanceof Set) {
+                yaml.append("\n");
+                List<?> sorted = ((Set<?>) value).stream().sorted().collect(Collectors.toList());
+                for (Object item : sorted) {
+                    splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+                }
+            }
             else {
                 yaml.append(' ').append(formatValue(value)).append('\n');
             }
@@ -364,7 +374,7 @@ public abstract class YamlFileInterface {
     private @NotNull String formatValue(final Object value) {
         String yamlContent = yaml.dump(value).trim();
 
-        if (value instanceof Enum) {
+        if (value instanceof Enum || value instanceof UUID) {
             // Remove the tag in the yaml
             // !!org.avarion.yaml.Material 'A' --> 'A'
             yamlContent = yamlContent.replaceAll("^!!\\S+\\s+", "");
@@ -380,9 +390,9 @@ public abstract class YamlFileInterface {
      * @throws IOException If there's an error writing to the file.
      *
      *                     <pre>{@code
-     *                     MyConfig config = new MyConfig();
-     *                     config.save(new File("config.yml"));
-     *                     }</pre>
+     *                                                             MyConfig config = new MyConfig();
+     *                                                             config.save(new File("config.yml"));
+     *                                                             }</pre>
      */
     public void save(final @NotNull File file) throws IOException {
         final File newFile = file.getAbsoluteFile();
