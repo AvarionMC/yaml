@@ -8,6 +8,10 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: [ "version-update:semver-patch" ]
+    groups:
+      github-actions:
+        patterns:
+          - '*'
 
     commit-message:
       prefix: ci
@@ -19,3 +23,7 @@ updates:
     ignore:
       - dependency-name: "org.yaml:snakeyaml"  # We want to stay on 1.14 to support as many versions of MC as possible
         versions: [ "version-update:semver-major" ]
+    groups:
+      packages:
+        patterns:
+          - '*'
