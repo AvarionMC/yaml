@@ -6,7 +6,7 @@ plugins {
 }
 
 
-def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
+def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.33'
 def isV1 = snakeYamlVersion.startsWith('1.')
 
 
@@ -59,8 +59,8 @@ repositories {
 }
 
 dependencies {
-    v1CompileOnly 'org.yaml:snakeyaml:1.14'
-    v2CompileOnly 'org.yaml:snakeyaml:2.2'
+    v1CompileOnly 'org.yaml:snakeyaml:1.33'
+    v2CompileOnly 'org.yaml:snakeyaml:1.33'
 
     runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
     testRuntimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
