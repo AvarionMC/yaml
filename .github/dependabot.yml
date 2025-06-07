@@ -18,4 +18,3 @@ updates:
       interval: "weekly"
     ignore:
       - dependency-name: "org.yaml:snakeyaml"  # We want to stay on 1.14 to support as many versions of MC as possible
-        update-types: [ "version-update:semver-major" ]
