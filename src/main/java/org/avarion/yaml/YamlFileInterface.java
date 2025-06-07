@@ -363,10 +363,6 @@ public abstract class YamlFileInterface {
         }
     }
 
-    private static boolean isPrimitiveType(Object value) {
-        return value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character;
-    }
-
     private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<String, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
