@@ -55,10 +55,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: |
-            **/reports/jacoco/report-1.14.xml
-            **/reports/jacoco/report-1.33.xml
-            **/reports/jacoco/report-2.4.xml
+          #          files: "**/reports/jacoco/report-1.14.xml,**/reports/jacoco/report-1.33.xml,**/reports/jacoco/report-2.4.xml"
           fail_ci_if_error: true
           verbose: true
 
