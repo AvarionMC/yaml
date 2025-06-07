@@ -6,7 +6,7 @@ plugins {
 }
 
 
-def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.33'
+def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
 def isV1 = snakeYamlVersion.startsWith('1.')
 
 
@@ -59,7 +59,7 @@ repositories {
 }
 
 dependencies {
-    v1CompileOnly 'org.yaml:snakeyaml:1.33'
+    v1CompileOnly 'org.yaml:snakeyaml:1.14'
     v2CompileOnly 'org.yaml:snakeyaml:2.4'
 
     runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
@@ -94,7 +94,7 @@ jacocoTestReport {
             required = true
             outputLocation = layout.buildDirectory.file('reports/jacoco/report-' + snakeYamlVersion + '.xml')
         }
-        html.required = true
+        html.required = false
     }
     sourceDirectories = files(sourceSets.common.allJava.srcDirs, isV1 ? sourceSets.v1.allJava.srcDirs : sourceSets.v2.allJava.srcDirs)
     classDirectories = files(sourceSets.common.output, isV1 ? sourceSets.v1.output : sourceSets.v2.output)
