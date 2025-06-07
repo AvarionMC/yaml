@@ -463,9 +463,23 @@ class YamlFileInterfaceTest extends TestCommon {
     void testSoundHasNoStringConstructor2() throws IOException {
         new SoundsConfig().save(target);
 
-        replaceInTarget("MY_SOUND_ROCKS", "\"my.sound.rocks\"");
+        replaceInTarget("MY_SOUND_ROCKS", "\"your.sound.rocks.too\"");
 
         SoundsConfig loaded = new SoundsConfig().load(target);
-        assertEquals(Sounds.MY_SOUND_ROCKS, loaded.sound);
+        assertEquals(Sounds.YOUR_SOUND_ROCKS_TOO, loaded.sound);
+    }
+
+    @Test
+    void testSoundCantRetrieveIt() throws IOException {
+        new SoundsConfig().save(target);
+
+        replaceInTarget("MY_SOUND_ROCKS", "bumba");
+
+        IOException thrown = assertThrows(
+                IOException.class, () -> {
+                    new SoundsConfig().load(target);
+                }
+        );
+        assertEquals("'Sounds': I cannot figure out how to retrieve this type.", thrown.getMessage());
     }
 }
