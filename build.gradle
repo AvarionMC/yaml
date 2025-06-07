@@ -60,12 +60,13 @@ repositories {
 
 dependencies {
     v1CompileOnly 'org.yaml:snakeyaml:1.33'
-    v2CompileOnly 'org.yaml:snakeyaml:1.33'
+    v2CompileOnly 'org.yaml:snakeyaml:2.4'
 
     runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
     testRuntimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
 
     commonImplementation 'org.jetbrains:annotations:26.0.2'
+    testImplementation 'org.jetbrains:annotations:26.0.2'
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.12.2'
     testImplementation 'org.junit.jupiter:junit-jupiter-params:5.12.2'

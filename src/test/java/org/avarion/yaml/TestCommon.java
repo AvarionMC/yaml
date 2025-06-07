@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
-public class TestCommon {
+class TestCommon {
     File target;
 
     protected void replaceInTarget(String text, String replacement) throws IOException {

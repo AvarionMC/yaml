@@ -13,6 +13,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -27,6 +29,33 @@ public abstract class YamlFileInterface {
 
     private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value, boolean isLenient) throws IOException {
         return getConvertedValue(field, field.getType(), value, isLenient);
+    }
+
+    private static @Nullable Object getFieldValue(final @NotNull Class<?> expectedType, final String fieldName)
+            throws NoSuchFieldException, IllegalAccessException {
+
+        Field found = null;
+        try {
+            found = expectedType.getDeclaredField(fieldName);
+        } catch (NoSuchFieldException ignored) {
+        }
+
+        if (found==null) {
+            final String replacedName = fieldName.replace('.', '_');
+            for (Field field : expectedType.getDeclaredFields()) {
+                if (field.getName().equalsIgnoreCase(fieldName) || field.getName().equalsIgnoreCase(replacedName)) {
+                    found = field;
+                    break;
+                }
+            }
+        }
+
+        if (found==null) {
+            throw new NoSuchFieldException(fieldName);
+        }
+
+        found.setAccessible(true);
+        return found.get(null);
     }
 
     private static @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value, boolean isLenient)
@@ -67,9 +96,15 @@ public abstract class YamlFileInterface {
         try {
             Constructor<?> constructor = expectedType.getConstructor(String.class);
             return constructor.newInstance(value.toString());
-        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-            throw new IOException("'" + expectedType.getSimpleName() + "' doesn't accept a single String argument to create the object.");
+        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException ignored) {
         }
+
+        try {
+            return getFieldValue(expectedType, value.toString());
+        } catch (IllegalAccessException | NoSuchFieldException ignored) {
+        }
+
+        throw new IOException("'" + expectedType.getSimpleName() + "': I cannot figure out how to retrieve this type.");
     }
 
     private static @Nullable Object handleNullValue(final @NotNull Class<?> expectedType, final Field field) throws IOException {
@@ -328,6 +363,10 @@ public abstract class YamlFileInterface {
         }
     }
 
+    private static boolean isPrimitiveType(Object value) {
+        return value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character;
+    }
+
     private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<String, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
@@ -367,17 +406,48 @@ public abstract class YamlFileInterface {
             else {
                 yaml.append(' ').append(formatValue(value)).append('\n');
             }
-
         }
     }
 
+    public static Optional<String> getStaticFieldName(Object value) {
+        try {
+            Class<?> clazz = value.getClass();
+
+            return Arrays.stream(clazz.getDeclaredFields())
+                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
+                         .filter(field -> {
+                             try {
+                                 field.setAccessible(true);
+                                 return field.get(null)==value;
+                             } catch (IllegalAccessException e) {
+                                 return false;
+                             }
+                         })
+                         .map(Field::getName)
+                         .findFirst();
+
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    Pattern genericToStringPattern = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
     private @NotNull String formatValue(final Object value) {
         String yamlContent = yaml.dump(value).trim();
 
         if (value instanceof Enum || value instanceof UUID) {
             // Remove the tag in the yaml
             // !!org.avarion.yaml.Material 'A' --> 'A'
-            yamlContent = yamlContent.replaceAll("^!!\\S+\\s+", "");
+            return yamlContent.replaceAll("^!!\\S+\\s+", "");
+        }
+        else {
+            Matcher matcher = genericToStringPattern.matcher(yamlContent);
+            if (matcher.matches()) {
+                Optional<String> originalName = getStaticFieldName(value);
+                if (originalName.isPresent()) {
+                    return originalName.get();
+                }
+            }
         }
 
         return yamlContent;

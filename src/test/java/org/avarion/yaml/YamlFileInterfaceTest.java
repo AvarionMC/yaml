@@ -428,7 +428,7 @@ class YamlFileInterfaceTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new CustomNonStringYml().load(target.toString());
         });
-        assertEquals("'CustomNonStringAcceptingClass' doesn't accept a single String argument to create the object.", thrown.getMessage());
+        assertEquals("'CustomNonStringAcceptingClass': I cannot figure out how to retrieve this type.", thrown.getMessage());
     }
 
     @Test
@@ -449,5 +449,23 @@ class YamlFileInterfaceTest extends TestCommon {
 
         LoadingUUIDs loaded = new LoadingUUIDs().load(target);
         assertEquals(Set.of(UUID.fromString("11111111-2222-9999-4444-555555555555")), loaded.key);
+    }
+
+    @Test
+    void testSoundHasNoStringConstructor() throws IOException {
+        new SoundsConfig().save(target);
+
+        SoundsConfig loaded = new SoundsConfig().load(target);
+        assertEquals(Sounds.MY_SOUND_ROCKS, loaded.sound);
+    }
+
+    @Test
+    void testSoundHasNoStringConstructor2() throws IOException {
+        new SoundsConfig().save(target);
+
+        replaceInTarget("MY_SOUND_ROCKS", "\"my.sound.rocks\"");
+
+        SoundsConfig loaded = new SoundsConfig().load(target);
+        assertEquals(Sounds.MY_SOUND_ROCKS, loaded.sound);
     }
 }
