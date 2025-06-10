@@ -10,16 +10,27 @@ def isV1 = snakeYamlVersion.startsWith('1.')
 
 static def getVersionFromGit() {
     try {
-        def isTagBuild = System.getenv('GIT_BRANCH')?.startsWith('refs/tags/')
+        def gitRef = null
+
+        // Check Jenkins first (has GIT_BRANCH)
+        if (System.getenv('GIT_BRANCH')) {
+            gitRef = System.getenv('GIT_BRANCH')
+        }
+        // Then check GitHub Actions (has GITHUB_ACTIONS=true)
+        else if (System.getenv('GITHUB_ACTIONS') == 'true') {
+            gitRef = System.getenv('GITHUB_REF')
+        }
+
+        def isTagBuild = gitRef?.startsWith('refs/tags/')
 
         def possible
         if (isTagBuild) {
-            possible = System.getenv('GIT_BRANCH').replaceAll('refs/tags/', '')
+            possible = gitRef.replaceAll('refs/tags/', '')
         }
         else {
             def gitOutput = 'git describe --tags --abbrev=0'.execute().text.trim()
-            println "Git output: '${gitOutput}'"
-            possible = "${gitOutput}-SNAPSHOT"
+            possible = gitOutput.isEmpty() ? "0.0.1" : gitOutput
+            possible += "-SNAPSHOT"
         }
 
         return possible.replaceAll('^v', '')
@@ -51,13 +62,13 @@ gradle.projectsEvaluated {
     println "Publications: ${publishing.publications.names.join(', ')}"
     println "=" * 60
     println ""
-    println "=" * 60
-    println "ENVIRONMENT VARIABLES"
-    println "=" * 60
-    System.getenv().sort().each { key, value ->
-        println "${key}: ${value}"
-    }
-    println "=" * 60
+//    println "=" * 60
+//    println "ENVIRONMENT VARIABLES"
+//    println "=" * 60
+//    System.getenv().sort().each { key, value ->
+//        println "${key}: ${value}"
+//    }
+//    println "=" * 60
 }
 
 java {
