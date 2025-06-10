@@ -48,6 +48,9 @@ jobs:
       - name: Run tests for 1.33
         run: ./gradlew test --info -PsnakeYamlVersion=1.33
 
+      - name: Run tests for 2.2
+        run: ./gradlew test --info -PsnakeYamlVersion=2.2
+
       - name: Run tests for 2.4
         run: ./gradlew test --info -PsnakeYamlVersion=2.4
 
@@ -55,7 +58,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: build/reports/jacoco/report-1.14.xml,build/reports/jacoco/report-1.33.xml,build/reports/jacoco/report-2.4.xml
+          files: build/reports/jacoco/report-1.14.xml,build/reports/jacoco/report-1.33.xml,build/reports/jacoco/report-2.2.xml,build/reports/jacoco/report-2.4.xml
           fail_ci_if_error: true
           verbose: true
 
