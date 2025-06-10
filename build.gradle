@@ -34,6 +34,28 @@ static def getVersionFromGit() {
             println ""
         }
 
+        // DEBUG: Show all available tags
+        println ""
+        println "AVAILABLE TAGS DEBUG"
+        println "=" * 60
+        try {
+            def allTags = 'git tag -l'.execute().text.trim()
+            println "All tags: ${allTags}"
+
+            def latestTag = 'git describe --tags --abbrev=0'.execute().text.trim()
+            println "Latest tag: ${latestTag}"
+
+            def gitStatus = 'git status --porcelain'.execute().text.trim()
+            println "Git status: ${gitStatus.isEmpty() ? 'clean' : 'dirty'}"
+
+            def currentCommit = 'git rev-parse HEAD'.execute().text.trim()
+            println "Current commit: ${currentCommit}"
+        } catch (Exception e) {
+            println "Git debug failed: ${e.message}"
+        }
+        println "=" * 60
+        println ""
+
         def isTagBuild = gitRef?.startsWith('refs/tags/')
 
         def possible
