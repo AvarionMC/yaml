@@ -15,6 +15,30 @@ if (isTagBuild) {
     version = "${project.version}-SNAPSHOT"
 }
 
+// Project Information Dump
+gradle.projectsEvaluated {
+    println "=" * 60
+    println "PROJECT INFORMATION"
+    println "=" * 60
+    println "Name: ${project.name}"
+    println "Group: ${project.group}"
+    println "Version: ${project.version}"
+    println "SnakeYAML Version: ${snakeYamlVersion}"
+    println "Using V1 API: ${isV1}"
+    println "Tag Build: ${isTagBuild}"
+    println "Git Branch: ${System.getenv('GIT_BRANCH') ?: 'N/A'}"
+    println "Project Dir: ${project.projectDir}"
+    println "Build Dir: ${layout.buildDirectory.get()}"
+    println "Java Source: ${java.sourceCompatibility}"
+    println "Java Target: ${java.targetCompatibility}"
+    println "Gradle Version: ${gradle.gradleVersion}"
+    println "Java Version: ${System.getProperty('java.version')}"
+    println "Source Sets: ${sourceSets.names.join(', ')}"
+    println "Publications: ${publishing.publications.names.join(', ')}"
+    println "=" * 60
+    println ""
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_1_9
     targetCompatibility = JavaVersion.VERSION_1_9
