@@ -51,6 +51,13 @@ gradle.projectsEvaluated {
     println "Publications: ${publishing.publications.names.join(', ')}"
     println "=" * 60
     println ""
+    println "=" * 60
+    println "ENVIRONMENT VARIABLES"
+    println "=" * 60
+    System.getenv().sort().each { key, value ->
+        println "${key}: ${value}"
+    }
+    println "=" * 60
 }
 
 java {
