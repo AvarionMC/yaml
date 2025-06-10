@@ -17,8 +17,9 @@ static def getVersionFromGit() {
             possible = System.getenv('GIT_BRANCH').replaceAll('refs/tags/', '')
         }
         else {
-            possible = 'git describe --tags --abbrev=0'.execute().text.trim()
-            possible += "-SNAPSHOT"
+            def gitOutput = 'git describe --tags --abbrev=0'.execute().text.trim()
+            println "Git output: '${gitOutput}'"
+            possible = "${gitOutput}-SNAPSHOT"
         }
 
         return possible.replaceAll('^v', '')
