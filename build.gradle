@@ -7,12 +7,89 @@ plugins {
 
 def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
 def isV1 = snakeYamlVersion.startsWith('1.')
-def isTagBuild = System.getenv('GIT_BRANCH')?.startsWith('refs/tags/')
 
-if (isTagBuild) {
-    version = System.getenv('GIT_BRANCH').replaceAll('refs/tags/', '')
-} else {
-    version = "${project.version}-SNAPSHOT"
+static def getVersionFromGit() {
+    try {
+        def gitRef = null
+
+        if (System.getenv('GIT_BRANCH')) {
+            gitRef = System.getenv('GIT_BRANCH')
+        } else if (System.getenv('GITHUB_ACTIONS') == 'true') {
+            gitRef = System.getenv('GITHUB_REF')
+        }
+
+        def isTagBuild = gitRef?.startsWith('refs/tags/')
+        if (isTagBuild) {
+            return gitRef.replaceAll('refs/tags/v?', '').replaceAll('^v', '')
+        }
+
+        def latestTag = 'git describe --tags --abbrev=0'.execute().text.trim()
+        if (latestTag.isEmpty()) {
+            return "0.0.1-SNAPSHOT"
+        }
+
+        def baseVersion = latestTag.replaceAll('^v', '')
+        def nextVersion = incrementVersion(baseVersion)
+
+        return "${nextVersion}-SNAPSHOT"
+    } catch (Exception ignored) {
+        return "0.0.1-SNAPSHOT"
+    }
+}
+
+static def incrementVersion(String version) {
+    def parts = version.split('\\.').collect { it as Integer }
+
+    // Pad to 3 parts if needed
+    while (parts.size() < 3) {
+        parts.add(0)
+    }
+
+    // Increment patch
+    parts[2] += 1
+
+    // Handle carries from right to left
+    for (int i = parts.size() - 1; i > 0; i--) {
+        if (parts[i] > 9) {
+            parts[i - 1] += parts[i].intdiv(10)
+            parts[i] = parts[i] % 10
+        }
+    }
+
+    return parts.join('.')
+}
+
+version = getVersionFromGit()
+
+// Project Information Dump
+gradle.projectsEvaluated {
+    println "=" * 60
+    println "PROJECT INFORMATION"
+    println "=" * 60
+    println "Name: ${project.name}"
+    println "Group: ${project.group}"
+    println "Version: ${project.version}"
+    println "SnakeYAML Version: ${snakeYamlVersion}"
+    println "Using V1 API: ${isV1}"
+    println "Env/GIT_BRANCH: ${System.getenv('GIT_BRANCH') ?: 'N/A'}"
+    println "Env/GITHUB_REF: ${System.getenv('GITHUB_REF') ?: 'N/A'}"
+    println "Project Dir: ${project.projectDir}"
+    println "Build Dir: ${layout.buildDirectory.get()}"
+    println "Java Source: ${java.sourceCompatibility}"
+    println "Java Target: ${java.targetCompatibility}"
+    println "Gradle Version: ${gradle.gradleVersion}"
+    println "Java Version: ${System.getProperty('java.version')}"
+    println "Source Sets: ${sourceSets.names.join(', ')}"
+    println "Publications: ${publishing.publications.names.join(', ')}"
+    println "=" * 60
+    println ""
+//    println "=" * 60
+//    println "ENVIRONMENT VARIABLES"
+//    println "=" * 60
+//    System.getenv().sort().each { key, value ->
+//        println "${key}: ${value}"
+//    }
+//    println "=" * 60
 }
 
 java {
@@ -65,7 +142,7 @@ repositories {
 
 dependencies {
     v1CompileOnly 'org.yaml:snakeyaml:1.14'
-    v2CompileOnly 'org.yaml:snakeyaml:2.4'
+    v2CompileOnly 'org.yaml:snakeyaml:2.2'
 
     runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
     testRuntimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
@@ -144,7 +221,9 @@ sonar {
         property 'sonar.core.codeCoveragePlugin', 'jacoco'
         property "sonar.coverage.jacoco.xmlReportPaths", [
                 "${layout.buildDirectory.get()}/reports/jacoco/report-1.14.xml",
-                "${layout.buildDirectory.get()}/reports/jacoco/report-2.2.xml"
+                "${layout.buildDirectory.get()}/reports/jacoco/report-1.33.xml",
+                "${layout.buildDirectory.get()}/reports/jacoco/report-2.2.xml",
+                "${layout.buildDirectory.get()}/reports/jacoco/report-2.4.xml"
         ].join(',')
     }
 }

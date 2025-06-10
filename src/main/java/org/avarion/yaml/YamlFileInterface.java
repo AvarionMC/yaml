@@ -13,6 +13,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -27,13 +28,21 @@ public abstract class YamlFileInterface {
     private static final YamlWrapper yaml = YamlWrapperFactory.create();
     private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
+    private static final Map<Class<?>, Supplier<Collection<Object>>> COLLECTION_FACTORIES;
+
+    static {
+        COLLECTION_FACTORIES = new HashMap<>();
+        COLLECTION_FACTORIES.put(Set.class, LinkedHashSet::new);
+        COLLECTION_FACTORIES.put(List.class, ArrayList::new);
+        COLLECTION_FACTORIES.put(Queue.class, ArrayDeque::new);
+    }
+
     private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value, boolean isLenient) throws IOException {
         return getConvertedValue(field, field.getType(), value, isLenient);
     }
 
     private static @Nullable Object getFieldValue(final @NotNull Class<?> expectedType, final String fieldName)
             throws NoSuchFieldException, IllegalAccessException {
-
         Field found = null;
         try {
             found = expectedType.getDeclaredField(fieldName);
@@ -70,6 +79,10 @@ public abstract class YamlFileInterface {
 
         if (value instanceof List<?>) {
             return handleCollectionValue(field, expectedType, (Collection<?>) value, isLenient);
+        }
+        if (Collection.class.isAssignableFrom(expectedType) && isLenient) {
+            // We allow a single String/int/... to be assigned to a Collection -- but only when we're in lenient mode
+            return handleCollectionValue(field, expectedType, List.of(value), isLenient);
         }
 
         if (expectedType.isInstance(value)) {
@@ -118,19 +131,13 @@ public abstract class YamlFileInterface {
         return null;
     }
 
+    /**
+     * Convert the incoming value into a Set/List
+     */
     private static @NotNull Object handleCollectionValue(
             final @Nullable Field field, final @NotNull Class<?> expectedType, final Collection<?> collection, boolean isLenient) throws IOException {
 
-        Collection<Object> result;
-        if (Set.class.isAssignableFrom(expectedType)) {
-            result = new LinkedHashSet<>();
-        }
-        else if (List.class.isAssignableFrom(expectedType)) {
-            result = new ArrayList<>();
-        }
-        else {
-            throw new IOException("Unsupported collection type: " + expectedType.getSimpleName());
-        }
+        Collection<Object> result = createCollectionInstance(expectedType);
 
         Class<?> elementType = Object.class;
         if (field!=null) {
@@ -145,6 +152,17 @@ public abstract class YamlFileInterface {
             result.add(convertedValue);
         }
         return result;
+    }
+
+    private static Collection<Object> createCollectionInstance(@NotNull Class<?> expectedType) throws IOException {
+        Supplier<Collection<Object>> factory = COLLECTION_FACTORIES.entrySet()
+                                                                   .stream()
+                                                                   .filter(entry -> entry.getKey().isAssignableFrom(expectedType))
+                                                                   .map(Map.Entry::getValue)
+                                                                   .findFirst()
+                                                                   .orElseThrow(() -> new IOException(
+                                                                           "Unsupported collection type: " + expectedType.getSimpleName()));
+        return factory.get();
     }
 
     private static boolean isBooleanType(final Class<?> type) {
@@ -214,10 +232,10 @@ public abstract class YamlFileInterface {
      * @return The current object instance after loading the YAML content.
      * @throws IOException If there's an error reading the file or parsing the YAML content.
      *
-     *                     <pre>{@code
-     *                                                             MyConfig config = new MyConfig();
-     *                                                             config.load(new File("config.yml"));
-     *                                                             }</pre>
+     * <pre>{@code
+     * MyConfig config = new MyConfig();
+     * config.load(new File("config.yml"));
+     * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
         if (!file.exists()) {
@@ -428,6 +446,7 @@ public abstract class YamlFileInterface {
     }
 
     Pattern genericToStringPattern = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
+
     private @NotNull String formatValue(final Object value) {
         String yamlContent = yaml.dump(value).trim();
 
@@ -455,10 +474,10 @@ public abstract class YamlFileInterface {
      * @param file The File object representing the YAML file to save to.
      * @throws IOException If there's an error writing to the file.
      *
-     *                     <pre>{@code
-     *                                                             MyConfig config = new MyConfig();
-     *                                                             config.save(new File("config.yml"));
-     *                                                             }</pre>
+     * <pre>{@code
+     * MyConfig config = new MyConfig();
+     * config.save(new File("config.yml"));
+     * }</pre>
      */
     public void save(final @NotNull File file) throws IOException {
         final File newFile = file.getAbsoluteFile();

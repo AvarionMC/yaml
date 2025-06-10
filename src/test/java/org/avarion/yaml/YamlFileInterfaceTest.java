@@ -3,6 +3,7 @@ package org.avarion.yaml;
 import org.avarion.yaml.testClasses.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
@@ -459,11 +460,14 @@ class YamlFileInterfaceTest extends TestCommon {
         assertEquals(Sounds.MY_SOUND_ROCKS, loaded.sound);
     }
 
-    @Test
-    void testSoundHasNoStringConstructor2() throws IOException {
+    @ParameterizedTest
+    @CsvSource({
+            "\"your.sound.rocks.too\"", "\"YOUR_SOUND_ROCKS_TOO\"", "\"your_sound_rocks_too\"",
+    })
+    void testSoundHasNoStringConstructor2(String replacementValue) throws IOException {
         new SoundsConfig().save(target);
 
-        replaceInTarget("MY_SOUND_ROCKS", "\"your.sound.rocks.too\"");
+        replaceInTarget("MY_SOUND_ROCKS", replacementValue);
 
         SoundsConfig loaded = new SoundsConfig().load(target);
         assertEquals(Sounds.YOUR_SOUND_ROCKS_TOO, loaded.sound);
