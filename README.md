@@ -161,7 +161,7 @@ plugins {
 }
 
 repositories {
-    maven { url 'https://repo.codemc.io/repository/maven-public/' }
+    maven { url 'https://repo.codemc.io/repository/avarionmc/' }
 }
 
 dependencies {
@@ -179,7 +179,7 @@ jar {
 <repositories>
     <repository>
         <id>codemc-repo</id>
-        <url>https://repo.codemc.io/repository/maven-public/</url>
+        <url>https://repo.codemc.io/repository/avarionmc/</url>
     </repository>
 </repositories>
 
