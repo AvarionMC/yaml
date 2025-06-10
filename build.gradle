@@ -93,10 +93,8 @@ test {
 
 jacocoTestReport {
     reports {
-        xml {
-            required = true
-            outputLocation = layout.buildDirectory.file('reports/jacoco/report-' + snakeYamlVersion + '.xml')
-        }
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file('reports/jacoco/report-' + snakeYamlVersion + '.xml')
         html.required = false
     }
     sourceDirectories = files(sourceSets.common.allJava.srcDirs, isV1 ? sourceSets.v1.allJava.srcDirs : sourceSets.v2.allJava.srcDirs)
