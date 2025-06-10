@@ -12,66 +12,55 @@ static def getVersionFromGit() {
     try {
         def gitRef = null
 
-        // Check Jenkins first (has GIT_BRANCH)
         if (System.getenv('GIT_BRANCH')) {
             gitRef = System.getenv('GIT_BRANCH')
-            println " --> GIT_BRANCH: ${gitRef}"
-        }
-        // Then check GitHub Actions (has GITHUB_ACTIONS=true)
-        else if (System.getenv('GITHUB_ACTIONS') == 'true') {
+        } else if (System.getenv('GITHUB_ACTIONS') == 'true') {
             gitRef = System.getenv('GITHUB_REF')
-            println " --> GITHUB_REF: ${gitRef}"
         }
-        else {
-            println " --> CANNOT FIND ANYTHING"
-            println ""
-            println "ENVIRONMENT VARIABLES"
-            println "=" * 60
-            System.getenv().sort().each { key, value ->
-                println "${key}: ${value}"
-            }
-            println "=" * 60
-            println ""
-        }
-
-        // DEBUG: Show all available tags
-        println ""
-        println "AVAILABLE TAGS DEBUG"
-        println "=" * 60
-        try {
-            def allTags = 'git tag -l'.execute().text.trim()
-            println "All tags: ${allTags}"
-
-            def latestTag = 'git describe --tags --abbrev=0'.execute().text.trim()
-            println "Latest tag: ${latestTag}"
-
-            def gitStatus = 'git status --porcelain'.execute().text.trim()
-            println "Git status: ${gitStatus.isEmpty() ? 'clean' : 'dirty'}"
-
-            def currentCommit = 'git rev-parse HEAD'.execute().text.trim()
-            println "Current commit: ${currentCommit}"
-        } catch (Exception e) {
-            println "Git debug failed: ${e.message}"
-        }
-        println "=" * 60
-        println ""
 
         def isTagBuild = gitRef?.startsWith('refs/tags/')
-
-        def possible
         if (isTagBuild) {
-            possible = gitRef.replaceAll('refs/tags/', '')
-        }
-        else {
-            def gitOutput = 'git describe --tags --abbrev=0'.execute().text.trim()
-            possible = gitOutput.isEmpty() ? "0.0.1" : gitOutput
-            possible += "-SNAPSHOT"
+            return gitRef.replaceAll('refs/tags/v?', '').replaceAll('^v', '')
         }
 
-        return possible.replaceAll('^v', '')
+        def latestTag = 'git describe --tags --abbrev=0'.execute().text.trim()
+        if (latestTag.isEmpty()) {
+            return "0.0.1-SNAPSHOT"
+        }
+
+        def baseVersion = latestTag.replaceAll('^v', '')
+        def nextVersion = incrementVersion(baseVersion)
+
+        return "${nextVersion}-SNAPSHOT"
     } catch (Exception ignored) {
         return "0.0.1-SNAPSHOT"
     }
+}
+
+static def incrementVersion(String version) {
+    def parts = version.split('\\.').collect { it as Integer }
+
+    // Pad to 3 parts if needed
+    while (parts.size() < 3) {
+        parts.add(0)
+    }
+
+    // Increment patch
+    parts[2] = parts[2] + 1
+
+    // Handle overflow: patch > 10 -> increment minor, reset patch
+    if (parts[2] > 10) {
+        parts[1] = parts[1] + 1
+        parts[2] = 0
+    }
+
+    // Handle overflow: minor > 10 -> increment major, reset minor
+    if (parts[1] > 10) {
+        parts[0] = parts[0] + 1
+        parts[1] = 0
+    }
+
+    return parts.join('.')
 }
 
 version = getVersionFromGit()
