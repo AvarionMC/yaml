@@ -85,34 +85,34 @@ param1: 1
 param2: 2
 
 sub:
-  # Demonstration of sub-sections -- short
-  short: 0
+    # Demonstration of sub-sections -- short
+    short: 0
 
-  # Demonstration of sub-sections -- integer
-  int: 0
+    # Demonstration of sub-sections -- integer
+    int: 0
 
-  # Demonstration of sub-sections -- long
-  long: 0
+    # Demonstration of sub-sections -- long
+    long: 0
 
-  # Demonstration of sub-sections -- String
-  string: "abc"
+    # Demonstration of sub-sections -- String
+    string: "abc"
 
-  # Demonstration of sub-sections -- float
-  float: 0.0
+    # Demonstration of sub-sections -- float
+    float: 0.0
 
-  # Demonstration of sub-sections -- double
-  double: 0.0
+    # Demonstration of sub-sections -- double
+    double: 0.0
 
-  # Demonstration of collections -- List of strings
-  list:
-    - item1
-    - item2
+    # Demonstration of collections -- List of strings
+    list:
+        - item1
+        - item2
 
-  # Demonstration of collections -- Set of integers
-  set:
-    - 1
-    - 2
-    - 3
+    # Demonstration of collections -- Set of integers
+    set:
+        - 1
+        - 2
+        - 3
 ```
 
 ## Advanced Usage
@@ -153,7 +153,64 @@ The library supports various data types including:
 
 ## Import
 
-[Follow the instructions here](https://jitpack.io/#AvarionMC/yaml)
+### Gradle
+
+```gradle
+plugins {
+    id 'com.gradleup.shadow'
+}
+
+repositories {
+    maven { url 'https://repo.codemc.io/repository/maven-public/' }
+}
+
+dependencies {
+    implementation 'org.avarion:yaml:VERSION'
+}
+
+jar {
+    dependsOn shadowJar
+}
+```
+
+### Maven
+
+```xml
+<repositories>
+    <repository>
+        <id>codemc-repo</id>
+        <url>https://repo.codemc.io/repository/maven-public/</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>org.avarion</groupId>
+        <artifactId>yaml</artifactId>
+        <version>VERSION</version>
+    </dependency>
+</dependencies>
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <version>3.4.1</version>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>shade</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+Replace `VERSION` with the latest version available at [codemc.io](https://repo.codemc.io/#browse/browse:browse:maven-public:org%2Favarion%2Fyaml).
 
 ## Leniency
 Leniency can be one of `UNDEFINED`, `STRICT` or `LENIENT`
