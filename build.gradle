@@ -10,11 +10,9 @@ def isV1 = snakeYamlVersion.startsWith('1.')
 def isTagBuild = System.getenv('GIT_BRANCH')?.startsWith('refs/tags/')
 
 if (isTagBuild) {
-    // Tag-specific build logic
     version = System.getenv('GIT_BRANCH').replaceAll('refs/tags/', '')
 } else {
-    // Skip build or use snapshot version
-    version = "${version}-SNAPSHOT"
+    version = "${project.version}-SNAPSHOT"
 }
 
 java {
@@ -117,7 +115,8 @@ publishing {
     }
     repositories {
         maven {
-            url = "https://repo.codemc.io/repository/{username}/"
+            url = "https://repo.codemc.io/repository/avarionmc/"
+
             def mavenUsername = System.getenv("JENKINS_USERNAME")
             def mavenPassword = System.getenv("JENKINS_PASSWORD")
 
