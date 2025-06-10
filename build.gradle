@@ -5,16 +5,21 @@ plugins {
     id "org.sonarqube" version "6.2.0.5505"
 }
 
-
 def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
 def isV1 = snakeYamlVersion.startsWith('1.')
+def isTagBuild = System.getenv('GIT_BRANCH')?.startsWith('refs/tags/')
 
+if (isTagBuild) {
+    version = System.getenv('GIT_BRANCH').replaceAll('refs/tags/', '')
+} else {
+    version = "${project.version}-SNAPSHOT"
+}
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_9
     targetCompatibility = JavaVersion.VERSION_1_9
+    withSourcesJar()
 }
-
 
 sourceSets {
     main.java.srcDirs = []
@@ -81,41 +86,47 @@ jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-
 test {
     useJUnitPlatform()
     finalizedBy jacocoTestReport
 }
 
-
 jacocoTestReport {
     reports {
-        xml {
-            required = true
-            outputLocation = layout.buildDirectory.file('reports/jacoco/report-' + snakeYamlVersion + '.xml')
-        }
+        xml.required = true
+        xml.outputLocation = layout.buildDirectory.file('reports/jacoco/report-' + snakeYamlVersion + '.xml')
         html.required = false
     }
     sourceDirectories = files(sourceSets.common.allJava.srcDirs, isV1 ? sourceSets.v1.allJava.srcDirs : sourceSets.v2.allJava.srcDirs)
     classDirectories = files(sourceSets.common.output, isV1 ? sourceSets.v1.output : sourceSets.v2.output)
 }
 
-
-// This is necessary for jitpack.io!
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            from components.java
             groupId = project.group
             artifactId = project.name
             version = project.version
+
+            from components.java
         }
     }
     repositories {
-        mavenLocal()
+        maven {
+            url = "https://repo.codemc.io/repository/avarionmc/"
+
+            def mavenUsername = System.getenv("JENKINS_USERNAME")
+            def mavenPassword = System.getenv("JENKINS_PASSWORD")
+
+            if (mavenUsername != null && mavenPassword != null) {
+                credentials {
+                    username = mavenUsername
+                    password = mavenPassword
+                }
+            }
+        }
     }
 }
-
 
 sonar {
     properties {
