@@ -39,7 +39,6 @@ gradle.projectsEvaluated {
     println "Version: ${project.version}"
     println "SnakeYAML Version: ${snakeYamlVersion}"
     println "Using V1 API: ${isV1}"
-    println "Tag Build: ${isTagBuild}"
     println "Git Branch: ${System.getenv('GIT_BRANCH') ?: 'N/A'}"
     println "Project Dir: ${project.projectDir}"
     println "Build Dir: ${layout.buildDirectory.get()}"
