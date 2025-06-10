@@ -7,13 +7,27 @@ plugins {
 
 def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
 def isV1 = snakeYamlVersion.startsWith('1.')
-def isTagBuild = System.getenv('GIT_BRANCH')?.startsWith('refs/tags/')
 
-if (isTagBuild) {
-    version = System.getenv('GIT_BRANCH').replaceAll('refs/tags/', '')
-} else {
-    version = "${project.version}-SNAPSHOT"
+static def getVersionFromGit() {
+    try {
+        def isTagBuild = System.getenv('GIT_BRANCH')?.startsWith('refs/tags/')
+
+        def possible
+        if (isTagBuild) {
+            possible = System.getenv('GIT_BRANCH').replaceAll('refs/tags/', '')
+        }
+        else {
+            possible = 'git describe --tags --abbrev=0'.execute().text.trim()
+            possible += "-SNAPSHOT"
+        }
+
+        return possible.replaceAll('^v', '')
+    } catch (Exception ignored) {
+        return "0.0.1-SNAPSHOT"
+    }
 }
+
+version = getVersionFromGit()
 
 // Project Information Dump
 gradle.projectsEvaluated {
