@@ -81,8 +81,8 @@ public abstract class YamlFileInterface {
             return handleCollectionValue(field, expectedType, (Collection<?>) value, isLenient);
         }
         if (Collection.class.isAssignableFrom(expectedType) && isLenient) {
-            // We allow a single String to be assigned to a collection
-            return handleCollectionValue(field, expectedType, List.of(value), true);
+            // We allow a single String/int/... to be assigned to a Collection -- but only when we're in lenient mode
+            return handleCollectionValue(field, expectedType, List.of(value), isLenient);
         }
 
         if (expectedType.isInstance(value)) {
