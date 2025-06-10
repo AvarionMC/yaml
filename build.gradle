@@ -15,10 +15,23 @@ static def getVersionFromGit() {
         // Check Jenkins first (has GIT_BRANCH)
         if (System.getenv('GIT_BRANCH')) {
             gitRef = System.getenv('GIT_BRANCH')
+            println " --> GIT_BRANCH: ${gitRef}"
         }
         // Then check GitHub Actions (has GITHUB_ACTIONS=true)
         else if (System.getenv('GITHUB_ACTIONS') == 'true') {
             gitRef = System.getenv('GITHUB_REF')
+            println " --> GITHUB_REF: ${gitRef}"
+        }
+        else {
+            println " --> CANNOT FIND ANYTHING"
+            println ""
+            println "ENVIRONMENT VARIABLES"
+            println "=" * 60
+            System.getenv().sort().each { key, value ->
+                println "${key}: ${value}"
+            }
+            println "=" * 60
+            println ""
         }
 
         def isTagBuild = gitRef?.startsWith('refs/tags/')
@@ -51,7 +64,8 @@ gradle.projectsEvaluated {
     println "Version: ${project.version}"
     println "SnakeYAML Version: ${snakeYamlVersion}"
     println "Using V1 API: ${isV1}"
-    println "Git Branch: ${System.getenv('GIT_BRANCH') ?: 'N/A'}"
+    println "Env/GIT_BRANCH: ${System.getenv('GIT_BRANCH') ?: 'N/A'}"
+    println "Env/GITHUB_REF: ${System.getenv('GITHUB_REF') ?: 'N/A'}"
     println "Project Dir: ${project.projectDir}"
     println "Build Dir: ${layout.buildDirectory.get()}"
     println "Java Source: ${java.sourceCompatibility}"
