@@ -71,6 +71,10 @@ public abstract class YamlFileInterface {
         if (value instanceof List<?>) {
             return handleCollectionValue(field, expectedType, (Collection<?>) value, isLenient);
         }
+        if (Collection.class.isAssignableFrom(expectedType) && isLenient) {
+            // We allow a single String to be assigned to a collection
+            return handleCollectionValue(field, expectedType, List.of(value), true);
+        }
 
         if (expectedType.isInstance(value)) {
             return value;
@@ -118,6 +122,9 @@ public abstract class YamlFileInterface {
         return null;
     }
 
+    /**
+     * Convert the incoming value into a Set/List
+     */
     private static @NotNull Object handleCollectionValue(
             final @Nullable Field field, final @NotNull Class<?> expectedType, final Collection<?> collection, boolean isLenient) throws IOException {
 

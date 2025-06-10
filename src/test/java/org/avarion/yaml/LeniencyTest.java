@@ -3,6 +3,7 @@ package org.avarion.yaml;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -123,6 +124,40 @@ class LeniencyTest extends TestCommon {
             new TestClass().load(target);
         });
         assertEquals("Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
+    }
+
+    @Test
+    void testListAcceptString() throws IOException {
+        @YamlFile(lenient = Leniency.LENIENT)
+        class TestClass extends YamlFileInterface {
+            @YamlKey("achievements")
+            public List<String> achievements = null;
+        }
+
+        new TestClass().save(target);
+        replaceInTarget(": null", ": \"Entry\"");
+
+        TestClass loaded = new TestClass().load(target);
+        assertEquals(List.of("Entry"), loaded.achievements);
+    }
+
+    @Test
+    void testListDoesNotAcceptString() throws IOException {
+        @YamlFile
+        class TestClass extends YamlFileInterface {
+            @YamlKey("achievements")
+            public List<String> achievements = null;
+        }
+
+        new TestClass().save(target);
+        replaceInTarget(": null", ": \"Entry\"");
+
+        IOException thrown = assertThrows(
+                IOException.class, () -> {
+                    new TestClass().load(target);
+                }
+        );
+        assertEquals("'List': I cannot figure out how to retrieve this type.", thrown.getMessage());
     }
 
 }
