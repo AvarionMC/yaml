@@ -141,8 +141,8 @@ repositories {
 }
 
 dependencies {
-    v1CompileOnly 'org.yaml:snakeyaml:1.14'
-    v2CompileOnly 'org.yaml:snakeyaml:2.2'
+    v1CompileOnly 'org.yaml:snakeyaml:2.4'
+    v2CompileOnly 'org.yaml:snakeyaml:2.4'
 
     runtimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
     testRuntimeOnly "org.yaml:snakeyaml:${snakeYamlVersion}"
