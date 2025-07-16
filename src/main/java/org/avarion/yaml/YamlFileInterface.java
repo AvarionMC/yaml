@@ -355,6 +355,7 @@ public abstract class YamlFileInterface {
                     throw new FinalAttribute(field.getName());
                 }
 
+                field.setAccessible(true);
                 Object value = field.get(this);
                 YamlComment comment = field.getAnnotation(YamlComment.class);
 
@@ -517,6 +518,7 @@ public abstract class YamlFileInterface {
 
         Object value = getNestedValue(data, key.split("\\."));
         if (value!=UNKNOWN) {
+            field.setAccessible(true);
             field.set(this, getConvertedValue(field, value, isLenient));
         }
     }

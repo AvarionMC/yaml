@@ -486,4 +486,18 @@ class YamlFileInterfaceTest extends TestCommon {
         );
         assertEquals("'Sounds': I cannot figure out how to retrieve this type.", thrown.getMessage());
     }
+
+    @Test
+    void testDifferentAccessLevels() throws IOException {
+        new PrivateYml().save(target);
+
+        replaceInTarget(": 1", ": 2");
+
+        PrivateYml loaded = new PrivateYml().load(target);
+
+        assertEquals(2, loaded.getPub());
+        assertEquals(2, loaded.getPriv());
+        assertEquals(2, loaded.getProt());
+        assertEquals(2, loaded.getNone());
+    }
 }
