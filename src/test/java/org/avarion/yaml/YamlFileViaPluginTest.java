@@ -20,6 +20,17 @@ class YamlFileViaPluginTest extends TestCommon {
         public int age = 30;
     }
 
+    static class HappyFlowWithoutAnnotation extends YamlFileInterface {
+        @YamlKey("age")
+        public int age = 30;
+    }
+
+    @YamlFile(fileName = "")
+    static class WrongAnnotation extends YamlFileInterface {
+        @YamlKey("age")
+        public int age = 30;
+    }
+
     @YamlFile(fileName = "test.yml")
     static class HappyFlowViaTest extends YamlFileInterface {
         @YamlKey("age")
@@ -36,6 +47,12 @@ class YamlFileViaPluginTest extends TestCommon {
 
         public File getDataFolder() {
             return dataFolder;
+        }
+    }
+
+    static class InheritedPlugin extends ValidPlugin {
+        public InheritedPlugin(File dataFolder) {
+            super(dataFolder);
         }
     }
 
@@ -97,6 +114,35 @@ class YamlFileViaPluginTest extends TestCommon {
     void testLoadWithValidPlugin() throws IOException {
         File dataFolder = tempDir.toFile();
         ValidPlugin plugin = new ValidPlugin(dataFolder);
+
+        // Create a test YAML file in the data folder
+        File yamlFile = new File(dataFolder, "test.yml");
+        HappyFlow original = new HappyFlow();
+        original.save(yamlFile);
+
+        // Create a new instance and load using plugin
+        HappyFlow loaded = new HappyFlow().load(plugin);
+
+        assertThat(loaded).isNotNull();
+        assertThat(loaded.age).isEqualTo(30);
+    }
+
+    @Test
+    void testLoadWithoutAnnotation() throws IOException {
+        File dataFolder = tempDir.toFile();
+        ValidPlugin plugin = new ValidPlugin(dataFolder);
+
+        // Create a test YAML file in the data folder
+        HappyFlowWithoutAnnotation original = new HappyFlowWithoutAnnotation();
+        original.save(plugin);
+
+        assertThat(new File(dataFolder, "config.yml")).exists();
+    }
+
+    @Test
+    void testLoadWithInheritedValidPlugin() throws IOException {
+        File dataFolder = tempDir.toFile();
+        InheritedPlugin plugin = new InheritedPlugin(dataFolder);
 
         // Create a test YAML file in the data folder
         File yamlFile = new File(dataFolder, "test.yml");
@@ -234,13 +280,36 @@ class YamlFileViaPluginTest extends TestCommon {
     }
 
     @Test
+    void testWrongFilenameAnnotation() {
+        HappyFlow plugin = new HappyFlow();
+
+        assertThatThrownBy(() -> new WrongAnnotation().save(plugin))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("Wrong filename specified in `@YamlFile` annotation");
+    }
+
+    @Test
     void testLoadWithNullReturningPlugin() {
         NullReturningPlugin plugin = new NullReturningPlugin();
 
         // This should throw an IOException when trying to create/access the file
         // since the data folder is null
         assertThatThrownBy(() -> new HappyFlow().load(plugin))
-                .isInstanceOf(Exception.class);
+                .isInstanceOf(Exception.class)
+                .hasMessageContaining("getDataFolder() method returned a non-existing directory");
+    }
+
+    @Test
+    void testLoadWithInvalidPluginDirectory() throws IOException {
+        File testFile = new File(tempDir.toFile(), "invalid");
+        testFile.createNewFile();
+        ValidPlugin plugin = new ValidPlugin(testFile);
+
+        // This should throw an IOException when trying to create/access the file
+        // since the data folder is null
+        assertThatThrownBy(() -> new HappyFlow().load(plugin))
+                .isInstanceOf(Exception.class)
+                .hasMessageContaining("getDataFolder() method returned a non-existing directory");
     }
 
     @Test

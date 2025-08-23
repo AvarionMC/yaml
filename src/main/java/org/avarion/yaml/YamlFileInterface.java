@@ -341,18 +341,14 @@ public abstract class YamlFileInterface {
             }
 
             // Use reflection to get the getDataFolder method from the plugin
-            Method getDataFolderMethod = plugin.getClass().getDeclaredMethod("getDataFolder");
-            if (!Modifier.isPublic(getDataFolderMethod.getModifiers())) {
-                throw new IOException("getDataFolder() method must be public");
-            }
-
-            Class<?> returnType = getDataFolderMethod.getReturnType();
+            Method dataFolderMethod = getDataFolderMethod(plugin);
+            Class<?> returnType = dataFolderMethod.getReturnType();
             if (!File.class.isAssignableFrom(returnType)) {
                 throw new IOException("getDataFolder method does not return a File object, but returns: " + returnType.getName() + " instead");
             }
 
-            File dataFolder = (File) getDataFolderMethod.invoke(plugin);
-            if ( dataFolder==null || (dataFolder.exists() && !dataFolder.isDirectory())) {
+            File dataFolder = (File) dataFolderMethod.invoke(plugin);
+            if (dataFolder==null || (dataFolder.exists() && !dataFolder.isDirectory())) {
                 throw new IOException("getDataFolder() method returned a non-existing directory");
             }
 
@@ -367,6 +363,27 @@ public abstract class YamlFileInterface {
         } catch (ClassCastException e) {
             throw new IOException(e.getMessage(), e);
         }
+    }
+
+    private static @NotNull Method getDataFolderMethod(@NotNull Object plugin) throws IOException, NoSuchMethodException {
+        Method getDataFolderMethod = null;
+        Class<?> currentClass = plugin.getClass();
+        while (currentClass!=null && getDataFolderMethod==null) {
+            try {
+                getDataFolderMethod = currentClass.getDeclaredMethod("getDataFolder");
+                if (!Modifier.isPublic(getDataFolderMethod.getModifiers())) {
+                    throw new IOException("getDataFolder() method must be public");
+                }
+            } catch (NoSuchMethodException e) {
+                currentClass = currentClass.getSuperclass();
+            }
+        }
+
+        if (getDataFolderMethod==null) {
+            throw new NoSuchMethodException("getDataFolder() method not found in class hierarchy");
+        }
+
+        return getDataFolderMethod;
     }
 
     private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull String[] keys) {
