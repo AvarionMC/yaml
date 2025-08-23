@@ -26,4 +26,5 @@ import java.lang.annotation.Target;
 public @interface YamlFile {
 	@NotNull String header() default "";
     Leniency lenient() default Leniency.STRICT;
+    @NotNull String fileName() default "config.yml";
 }
