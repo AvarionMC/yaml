@@ -341,9 +341,21 @@ public abstract class YamlFileInterface {
             }
 
             // Use reflection to get the getDataFolder method from the plugin
-            Method getDataFolderMethod = plugin.getClass().getDeclaredMethod("getDataFolder");
-            if (!Modifier.isPublic(getDataFolderMethod.getModifiers())) {
-                throw new IOException("getDataFolder() method must be public");
+            Method getDataFolderMethod = null;
+            Class<?> currentClass = plugin.getClass();
+            while (currentClass!=null && getDataFolderMethod==null) {
+                try {
+                    getDataFolderMethod = currentClass.getDeclaredMethod("getDataFolder");
+                    if (!Modifier.isPublic(getDataFolderMethod.getModifiers())) {
+                        throw new IOException("getDataFolder() method must be public");
+                    }
+                } catch (NoSuchMethodException e) {
+                    currentClass = currentClass.getSuperclass();
+                }
+            }
+
+            if (getDataFolderMethod==null) {
+                throw new NoSuchMethodException("getDataFolder() method not found in class hierarchy");
             }
 
             Class<?> returnType = getDataFolderMethod.getReturnType();
@@ -352,7 +364,7 @@ public abstract class YamlFileInterface {
             }
 
             File dataFolder = (File) getDataFolderMethod.invoke(plugin);
-            if ( dataFolder==null || (dataFolder.exists() && !dataFolder.isDirectory())) {
+            if (dataFolder==null || (dataFolder.exists() && !dataFolder.isDirectory())) {
                 throw new IOException("getDataFolder() method returned a non-existing directory");
             }
 

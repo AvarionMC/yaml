@@ -20,6 +20,12 @@ class YamlFileViaPluginTest extends TestCommon {
         public int age = 30;
     }
 
+    @YamlFile(fileName = "")
+    static class WrongAnnotation extends YamlFileInterface {
+        @YamlKey("age")
+        public int age = 30;
+    }
+
     @YamlFile(fileName = "test.yml")
     static class HappyFlowViaTest extends YamlFileInterface {
         @YamlKey("age")
@@ -36,6 +42,12 @@ class YamlFileViaPluginTest extends TestCommon {
 
         public File getDataFolder() {
             return dataFolder;
+        }
+    }
+
+    static class InheritedPlugin extends ValidPlugin {
+        public InheritedPlugin(File dataFolder) {
+            super(dataFolder);
         }
     }
 
@@ -97,6 +109,23 @@ class YamlFileViaPluginTest extends TestCommon {
     void testLoadWithValidPlugin() throws IOException {
         File dataFolder = tempDir.toFile();
         ValidPlugin plugin = new ValidPlugin(dataFolder);
+
+        // Create a test YAML file in the data folder
+        File yamlFile = new File(dataFolder, "test.yml");
+        HappyFlow original = new HappyFlow();
+        original.save(yamlFile);
+
+        // Create a new instance and load using plugin
+        HappyFlow loaded = new HappyFlow().load(plugin);
+
+        assertThat(loaded).isNotNull();
+        assertThat(loaded.age).isEqualTo(30);
+    }
+
+    @Test
+    void testLoadWithInheritedValidPlugin() throws IOException {
+        File dataFolder = tempDir.toFile();
+        InheritedPlugin plugin = new InheritedPlugin(dataFolder);
 
         // Create a test YAML file in the data folder
         File yamlFile = new File(dataFolder, "test.yml");
@@ -231,6 +260,15 @@ class YamlFileViaPluginTest extends TestCommon {
         assertThatThrownBy(() -> new HappyFlow().save(plugin))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("getDataFolder() method must be public");
+    }
+
+    @Test
+    void testWrongFilenameAnnotation() {
+        HappyFlow plugin = new HappyFlow();
+
+        assertThatThrownBy(() -> new WrongAnnotation().save(plugin))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("Wrong filename specified in `@YamlFile` annotation");
     }
 
     @Test
