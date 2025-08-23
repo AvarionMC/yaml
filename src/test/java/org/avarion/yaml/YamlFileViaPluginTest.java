@@ -255,7 +255,7 @@ class YamlFileViaPluginTest extends TestCommon {
 
     @Test
     void testLoadWithNonExistentDataFolder() {
-        File nonExistentFolder = new File("/this/path/does/not/exist");
+        File nonExistentFolder = new File(tempDir.toFile(), "new/nested/folder");
         ValidPlugin plugin = new ValidPlugin(nonExistentFolder);
 
         // Should create the file and parent directories if they don't exist
