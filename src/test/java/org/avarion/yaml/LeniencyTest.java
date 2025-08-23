@@ -143,7 +143,7 @@ class LeniencyTest extends TestCommon {
 
     @Test
     void testListDoesNotAcceptString() throws IOException {
-        @YamlFile
+        @YamlFile(lenient = Leniency.STRICT)
         class TestClass extends YamlFileInterface {
             @YamlKey("achievements")
             public List<String> achievements = null;
