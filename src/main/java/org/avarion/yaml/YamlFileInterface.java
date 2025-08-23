@@ -304,6 +304,71 @@ public abstract class YamlFileInterface {
         return load(new File(file));
     }
 
+    /**
+     * Loads the YAML content from the specified file path into this object.
+     * Uses reflection to get the plugin's data folder and combines it with the
+     * filename specified in the YamlFile annotation.
+     *
+     * @param plugin The plugin instance to get the data folder from.
+     * @param <T>    The type of YamlFileInterface implementation.
+     * @return The current object instance after loading the YAML content.
+     * @throws IOException              If there's an error reading the file or parsing the YAML content.
+     * @throws IllegalArgumentException If the YamlFile annotation is not present or reflection fails.
+     * @see #load(File)
+     *
+     * <pre>{@code
+     * @YamlFile(filename = "config.yml")
+     * public class MyConfig implements YamlFileInterface {
+     *     // implementation
+     * }
+     *
+     * MyConfig config = new MyConfig();
+     * config.load(pluginInstance);
+     * }</pre>
+     */
+    public <T extends YamlFileInterface> T load(final @NotNull Object plugin) throws IOException {
+        return load(getYamlFile(plugin));
+    }
+
+    @Contract("_ -> new")
+    private @NotNull File getYamlFile(final @NotNull Object plugin) throws IOException {
+        try {
+            // Get the YamlFile annotation from this class
+            YamlFile yamlFileAnnotation = this.getClass().getAnnotation(YamlFile.class);
+            String filename = yamlFileAnnotation==null ? "config.yml":yamlFileAnnotation.fileName();
+            if (filename.trim().isEmpty()) {
+                throw new IOException("Wrong filename specified in `@YamlFile` annotation");
+            }
+
+            // Use reflection to get the getDataFolder method from the plugin
+            Method getDataFolderMethod = plugin.getClass().getDeclaredMethod("getDataFolder");
+            if (!Modifier.isPublic(getDataFolderMethod.getModifiers())) {
+                throw new IOException("getDataFolder() method must be public");
+            }
+
+            Class<?> returnType = getDataFolderMethod.getReturnType();
+            if (!File.class.isAssignableFrom(returnType)) {
+                throw new IOException("getDataFolder method does not return a File object, but returns: " + returnType.getName() + " instead");
+            }
+
+            File dataFolder = (File) getDataFolderMethod.invoke(plugin);
+            if ( dataFolder==null || (dataFolder.exists() && !dataFolder.isDirectory())) {
+                throw new IOException("getDataFolder() method returned a non-existing directory");
+            }
+
+            // Create the full path by combining data folder and filename
+            return new File(dataFolder, filename);
+        } catch (NoSuchMethodException e) {
+            throw new IOException("Plugin does not have a getDataFolder() method with no parameters", e);
+        } catch (IllegalAccessException e) {
+            throw new IOException("getDataFolder() method must be public", e);
+        } catch (InvocationTargetException e) {
+            throw new IOException(e.getMessage(), e);
+        } catch (ClassCastException e) {
+            throw new IOException(e.getMessage(), e);
+        }
+    }
+
     private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull String[] keys) {
         return getNestedValue(map, new ArrayList<>(Arrays.asList(keys)));
     }
@@ -505,6 +570,30 @@ public abstract class YamlFileInterface {
      */
     public void save(@NotNull final String target) throws IOException {
         save(new File(target));
+    }
+
+    /**
+     * Saves the current object's content to the YAML file in the plugin's data folder.
+     * Uses reflection to get the plugin's data folder and combines it with the
+     * filename specified in the YamlFile annotation.
+     *
+     * @param plugin The plugin instance to get the data folder from.
+     * @throws IOException              If there's an error writing to the file.
+     * @throws IllegalArgumentException If the YamlFile annotation is not present or reflection fails.
+     * @see #save(File)
+     *
+     * <pre>{@code
+     * @YamlFile(filename = "config.yml")
+     * public class MyConfig implements YamlFileInterface {
+     *     // implementation
+     * }
+     *
+     * MyConfig config = new MyConfig();
+     * config.save(pluginInstance);
+     * }</pre>
+     */
+    public void save(final @NotNull Object plugin) throws IOException {
+        save(getYamlFile(plugin));
     }
 
     private void readYamlKeyField(Map<String, Object> data, @NotNull Field field, @NotNull YamlKey annotation, boolean isLenientByDefault)
