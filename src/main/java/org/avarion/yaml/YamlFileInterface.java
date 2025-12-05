@@ -138,7 +138,8 @@ public abstract class YamlFileInterface {
     /**
      * Extract generic type arguments from a field's parameterized type
      */
-    private static Type[] extractGenericTypeArguments(final @Nullable Field field) {
+    @Contract("null -> new")
+    private static Type @NotNull [] extractGenericTypeArguments(final @Nullable Field field) {
         if (field!=null) {
             Type genericType = field.getGenericType();
             if (genericType instanceof ParameterizedType) {
@@ -152,7 +153,7 @@ public abstract class YamlFileInterface {
      * Convert the incoming value into a Set/List
      */
     private static @NotNull Object handleCollectionValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final Collection<?> collection, boolean isLenient) throws IOException {
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection, boolean isLenient) throws IOException {
 
         Collection<Object> result = createCollectionInstance(expectedType);
 
