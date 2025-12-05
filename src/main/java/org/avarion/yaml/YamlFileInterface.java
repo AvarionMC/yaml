@@ -497,15 +497,15 @@ public abstract class YamlFileInterface {
         }
     }
 
-    private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<String, Object> map, final int indent) {
+    private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<Object, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
             tmp.append("  ");
         }
         final String indentStr = tmp.toString();
 
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
+        for (Map.Entry<Object, Object> entry : map.entrySet()) {
+            Object key = entry.getKey();
             Object value = entry.getValue();
 
             if (value instanceof NestedMap.NestedNode) {
@@ -518,7 +518,7 @@ public abstract class YamlFileInterface {
             yaml.append(indentStr).append(key).append(":");
             if (value instanceof Map) {
                 yaml.append("\n");
-                convertNestedMapToYaml(yaml, (Map<String, Object>) value, indent + 1);
+                convertNestedMapToYaml(yaml, (Map<Object, Object>) value, indent + 1);
             }
             else if (value instanceof List) {
                 yaml.append("\n");
