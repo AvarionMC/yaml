@@ -8,16 +8,16 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 class NestedMap {
-	private final Map<String, Object> map = new LinkedHashMap<>();
+	private final Map<Object, Object> map = new LinkedHashMap<>();
 
 	@SuppressWarnings("unchecked")
 	public void put(@NotNull String key, @Nullable String comment, Object value) throws DuplicateKey {
 		String[] keys = key.split("\\.");
 
-		Map<String, Object> current = map;
+		Map<Object, Object> current = map;
 		for (int i = 0; i < keys.length - 1; i++) {
 			final String k = keys[i];
-			current = (Map<String, Object>) current.computeIfAbsent(k, x -> new LinkedHashMap<>());
+			current = (Map<Object, Object>) current.computeIfAbsent(k, x -> new LinkedHashMap<>());
 		}
 		final String lastKey = keys[keys.length - 1];
 		if (current.containsKey(lastKey)) {
@@ -27,7 +27,7 @@ class NestedMap {
 		current.put(lastKey, new NestedNode(value, comment));
 	}
 
-	public Map<String, Object> getMap() {
+	public Map<Object, Object> getMap() {
 		return map;
 	}
 

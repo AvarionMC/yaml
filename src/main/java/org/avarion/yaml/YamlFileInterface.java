@@ -85,6 +85,10 @@ public abstract class YamlFileInterface {
             return handleCollectionValue(field, expectedType, List.of(value), isLenient);
         }
 
+        if (value instanceof Map && Map.class.isAssignableFrom(expectedType)) {
+            return handleMapValue(field, expectedType, (Map<?, ?>) value, isLenient);
+        }
+
         if (expectedType.isInstance(value)) {
             return value;
         }
@@ -132,24 +136,53 @@ public abstract class YamlFileInterface {
     }
 
     /**
-     * Convert the incoming value into a Set/List
+     * Extract generic type arguments from a field's parameterized type
      */
-    private static @NotNull Object handleCollectionValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final Collection<?> collection, boolean isLenient) throws IOException {
-
-        Collection<Object> result = createCollectionInstance(expectedType);
-
-        Class<?> elementType = Object.class;
+    @Contract("null -> new")
+    private static Type @NotNull [] extractGenericTypeArguments(final @Nullable Field field) {
         if (field!=null) {
             Type genericType = field.getGenericType();
             if (genericType instanceof ParameterizedType) {
-                elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
+                return ((ParameterizedType) genericType).getActualTypeArguments();
             }
         }
+        return new Type[0];
+    }
+
+    /**
+     * Convert the incoming value into a Set/List
+     */
+    private static @NotNull Object handleCollectionValue(
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection, boolean isLenient) throws IOException {
+
+        Collection<Object> result = createCollectionInstance(expectedType);
+
+        Type[] typeArgs = extractGenericTypeArguments(field);
+        Class<?> elementType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
 
         for (Object item : collection) {
             Object convertedValue = getConvertedValue(null, elementType, item, isLenient);
             result.add(convertedValue);
+        }
+        return result;
+    }
+
+    /**
+     * Convert the incoming value into a Map with properly typed keys and values
+     */
+    private static @NotNull Object handleMapValue(
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
+
+        Map<Object, Object> result = new LinkedHashMap<>();
+
+        Type[] typeArgs = extractGenericTypeArguments(field);
+        Class<?> keyType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
+        Class<?> valueType = typeArgs.length > 1 ? (Class<?>) typeArgs[1] : Object.class;
+
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object convertedKey = getConvertedValue(null, keyType, entry.getKey(), isLenient);
+            Object convertedValue = getConvertedValue(null, valueType, entry.getValue(), isLenient);
+            result.put(convertedKey, convertedValue);
         }
         return result;
     }
@@ -464,15 +497,15 @@ public abstract class YamlFileInterface {
         }
     }
 
-    private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<String, Object> map, final int indent) {
+    private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<Object, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
             tmp.append("  ");
         }
         final String indentStr = tmp.toString();
 
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = entry.getKey();
+        for (Map.Entry<Object, Object> entry : map.entrySet()) {
+            Object key = entry.getKey();
             Object value = entry.getValue();
 
             if (value instanceof NestedMap.NestedNode) {
@@ -485,7 +518,7 @@ public abstract class YamlFileInterface {
             yaml.append(indentStr).append(key).append(":");
             if (value instanceof Map) {
                 yaml.append("\n");
-                convertNestedMapToYaml(yaml, (Map<String, Object>) value, indent + 1);
+                convertNestedMapToYaml(yaml, (Map<Object, Object>) value, indent + 1);
             }
             else if (value instanceof List) {
                 yaml.append("\n");
