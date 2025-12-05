@@ -85,6 +85,10 @@ public abstract class YamlFileInterface {
             return handleCollectionValue(field, expectedType, List.of(value), isLenient);
         }
 
+        if (value instanceof Map && Map.class.isAssignableFrom(expectedType)) {
+            return handleMapValue(field, expectedType, (Map<?, ?>) value, isLenient);
+        }
+
         if (expectedType.isInstance(value)) {
             return value;
         }
@@ -150,6 +154,35 @@ public abstract class YamlFileInterface {
         for (Object item : collection) {
             Object convertedValue = getConvertedValue(null, elementType, item, isLenient);
             result.add(convertedValue);
+        }
+        return result;
+    }
+
+    /**
+     * Convert the incoming value into a Map with properly typed keys and values
+     */
+    private static @NotNull Object handleMapValue(
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
+
+        Map<Object, Object> result = new LinkedHashMap<>();
+
+        Class<?> keyType = Object.class;
+        Class<?> valueType = Object.class;
+        if (field!=null) {
+            Type genericType = field.getGenericType();
+            if (genericType instanceof ParameterizedType) {
+                Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
+                if (typeArguments.length >= 2) {
+                    keyType = (Class<?>) typeArguments[0];
+                    valueType = (Class<?>) typeArguments[1];
+                }
+            }
+        }
+
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object convertedKey = getConvertedValue(null, keyType, entry.getKey(), isLenient);
+            Object convertedValue = getConvertedValue(null, valueType, entry.getValue(), isLenient);
+            result.put(convertedKey, convertedValue);
         }
         return result;
     }
