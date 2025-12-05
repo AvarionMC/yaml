@@ -136,6 +136,19 @@ public abstract class YamlFileInterface {
     }
 
     /**
+     * Extract generic type arguments from a field's parameterized type
+     */
+    private static Type[] extractGenericTypeArguments(final @Nullable Field field) {
+        if (field!=null) {
+            Type genericType = field.getGenericType();
+            if (genericType instanceof ParameterizedType) {
+                return ((ParameterizedType) genericType).getActualTypeArguments();
+            }
+        }
+        return new Type[0];
+    }
+
+    /**
      * Convert the incoming value into a Set/List
      */
     private static @NotNull Object handleCollectionValue(
@@ -143,13 +156,8 @@ public abstract class YamlFileInterface {
 
         Collection<Object> result = createCollectionInstance(expectedType);
 
-        Class<?> elementType = Object.class;
-        if (field!=null) {
-            Type genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType) {
-                elementType = (Class<?>) ((ParameterizedType) genericType).getActualTypeArguments()[0];
-            }
-        }
+        Type[] typeArgs = extractGenericTypeArguments(field);
+        Class<?> elementType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
 
         for (Object item : collection) {
             Object convertedValue = getConvertedValue(null, elementType, item, isLenient);
@@ -166,18 +174,9 @@ public abstract class YamlFileInterface {
 
         Map<Object, Object> result = new LinkedHashMap<>();
 
-        Class<?> keyType = Object.class;
-        Class<?> valueType = Object.class;
-        if (field!=null) {
-            Type genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType) {
-                Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
-                if (typeArguments.length >= 2) {
-                    keyType = (Class<?>) typeArguments[0];
-                    valueType = (Class<?>) typeArguments[1];
-                }
-            }
-        }
+        Type[] typeArgs = extractGenericTypeArguments(field);
+        Class<?> keyType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
+        Class<?> valueType = typeArgs.length > 1 ? (Class<?>) typeArgs[1] : Object.class;
 
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object convertedKey = getConvertedValue(null, keyType, entry.getKey(), isLenient);
