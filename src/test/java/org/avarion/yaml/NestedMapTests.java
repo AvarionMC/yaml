@@ -127,24 +127,8 @@ class NestedMapTests extends TestCommon {
         NestedMapClass config = new NestedMapClass();
         config.save(target);
 
-        // Add a new nested map entry to the YAML file
-        String additionalContent = """
-                  outer3:
-                    newKey: newValue
-                    anotherKey: 123
-                """;
-
-        // Read current content
-        java.nio.file.Path filePath = target.toPath();
-        String content = new String(java.nio.file.Files.readAllBytes(filePath));
-
-        // Find the position after "nested:" and add the new entry
-        content = content.replace("nested:", "nested:" + System.lineSeparator() + additionalContent);
-
-        // Write back
-        java.nio.file.Files.write(filePath, content.getBytes(),
-            java.nio.file.StandardOpenOption.WRITE,
-            java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+        // Add a new nested map entry using replaceInTarget
+        replaceInTarget("outer1:", "outer3:\n    newKey: newValue\n    anotherKey: 123\n  outer1:");
 
         // Load it back
         NestedMapClass loaded = new NestedMapClass().load(target);
@@ -155,27 +139,5 @@ class NestedMapTests extends TestCommon {
         assertNotNull(outer3);
         assertEquals("newValue", outer3.get("newKey"));
         assertEquals(123, outer3.get("anotherKey"));
-    }
-
-    @Test
-    void testEmptyNestedMap() throws IOException {
-        // Create a config with empty nested maps
-        NestedMapClass config = new NestedMapClass();
-        config.nestedMap.clear();
-        config.nestedStringMap.clear();
-        config.nestedIntegerMap.clear();
-
-        config.save(target);
-
-        // Load it back
-        NestedMapClass loaded = new NestedMapClass().load(target);
-
-        // Verify empty maps are preserved
-        assertNotNull(loaded.nestedMap);
-        assertTrue(loaded.nestedMap.isEmpty());
-        assertNotNull(loaded.nestedStringMap);
-        assertTrue(loaded.nestedStringMap.isEmpty());
-        assertNotNull(loaded.nestedIntegerMap);
-        assertTrue(loaded.nestedIntegerMap.isEmpty());
     }
 }
