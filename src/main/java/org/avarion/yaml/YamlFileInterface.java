@@ -248,8 +248,55 @@ public abstract class YamlFileInterface {
             return result;
         }
 
-        // For non-parameterized types, use regular conversion
-        return getConvertedValue(null, rawClass, value, isLenient);
+        // For simple types (primitives, String, enums, etc.), return as-is or convert
+        if (rawClass.isInstance(value)) {
+            return value;
+        }
+
+        // Handle enums
+        if (rawClass.isEnum() && value instanceof String) {
+            return stringToEnum((Class<? extends Enum>) rawClass, (String) value);
+        }
+
+        // Handle UUID
+        if (value instanceof String && rawClass.equals(UUID.class)) {
+            return UUID.fromString((String) value);
+        }
+
+        // Handle boolean conversion
+        if (isBooleanType(rawClass)) {
+            return convertToBoolean(value);
+        }
+
+        // Handle number conversion
+        if (value instanceof Number) {
+            return convertToNumber((Number) value, rawClass, isLenient);
+        }
+
+        // Handle character conversion
+        if (isCharacterType(rawClass)) {
+            return convertToCharacter(String.valueOf(value), isLenient);
+        }
+
+        // Try constructor that takes a String parameter
+        if (value instanceof String) {
+            try {
+                Constructor<?> constructor = rawClass.getConstructor(String.class);
+                return constructor.newInstance((String) value);
+            } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException ignored) {
+            }
+        }
+
+        // Try static field lookup
+        if (value instanceof String) {
+            try {
+                return getFieldValue(rawClass, (String) value);
+            } catch (IllegalAccessException | NoSuchFieldException ignored) {
+            }
+        }
+
+        // If all else fails, return the value as-is
+        return value;
     }
 
     private static Collection<Object> createCollectionInstance(@NotNull Class<?> expectedType) throws IOException {
