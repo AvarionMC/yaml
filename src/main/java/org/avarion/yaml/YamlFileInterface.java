@@ -155,23 +155,13 @@ public abstract class YamlFileInterface {
     private static @NotNull Object handleCollectionValue(
             final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection, boolean isLenient) throws IOException {
 
+        if (field != null && field.getGenericType() instanceof ParameterizedType) {
+            return handleCollectionValueWithType(field.getGenericType(), collection, isLenient);
+        }
+
         Collection<Object> result = createCollectionInstance(expectedType);
-
-        Type[] typeArgs = extractGenericTypeArguments(field);
-        Type elementTypeArg = typeArgs.length > 0 ? typeArgs[0] : Object.class;
-        Class<?> elementType = getRawClass(elementTypeArg);
-
         for (Object item : collection) {
-            // For element conversion, if the type argument is a ParameterizedType (e.g., Map<String, Object>),
-            // we need to pass that type information along
-            Object convertedValue;
-            if (elementTypeArg instanceof ParameterizedType) {
-                Field syntheticField = createSyntheticField(elementTypeArg);
-                convertedValue = getConvertedValue(syntheticField, elementType, item, isLenient);
-            } else {
-                convertedValue = getConvertedValue(null, elementType, item, isLenient);
-            }
-            result.add(convertedValue);
+            result.add(item);
         }
         return result;
     }
@@ -192,35 +182,41 @@ public abstract class YamlFileInterface {
     }
 
     /**
-     * Create a synthetic Field to carry generic type information for nested types
+     * Convert value with Type information (for nested parameterized types)
      */
-    private static Field createSyntheticField(Type type) {
-        try {
-            // Create a temporary class with a field of the desired type
-            class TypeCarrier {
-                @SuppressWarnings("unused")
-                Object field;
-            }
-            Field syntheticField = TypeCarrier.class.getDeclaredField("field");
-            // Use reflection to set the generic type
-            Field genericTypeField = Field.class.getDeclaredField("genericType");
-            genericTypeField.setAccessible(true);
-            genericTypeField.set(syntheticField, type);
-            return syntheticField;
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            return null;
+    private static @Nullable Object getConvertedValueWithType(
+            final @NotNull Type type, final Object value, boolean isLenient) throws IOException {
+
+        Class<?> expectedType = getRawClass(type);
+
+        if (value == null) {
+            return handleNullValue(expectedType, null);
         }
+
+        if (value instanceof Map && Map.class.isAssignableFrom(expectedType)) {
+            return handleMapValueWithType(type, (Map<?, ?>) value, isLenient);
+        }
+
+        if (value instanceof List && Collection.class.isAssignableFrom(expectedType)) {
+            return handleCollectionValueWithType(type, (Collection<?>) value, isLenient);
+        }
+
+        // For non-parameterized types, use the regular conversion
+        return getConvertedValue(null, expectedType, value, isLenient);
     }
 
     /**
-     * Convert the incoming value into a Map with properly typed keys and values
+     * Handle Map with explicit Type information
      */
-    private static @NotNull Object handleMapValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
+    private static @NotNull Object handleMapValueWithType(
+            final @NotNull Type type, final Map<?, ?> map, boolean isLenient) throws IOException {
 
         Map<Object, Object> result = new LinkedHashMap<>();
 
-        Type[] typeArgs = extractGenericTypeArguments(field);
+        Type[] typeArgs = type instanceof ParameterizedType
+            ? ((ParameterizedType) type).getActualTypeArguments()
+            : new Type[0];
+
         Type keyTypeArg = typeArgs.length > 0 ? typeArgs[0] : Object.class;
         Type valueTypeArg = typeArgs.length > 1 ? typeArgs[1] : Object.class;
 
@@ -230,17 +226,61 @@ public abstract class YamlFileInterface {
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object convertedKey = getConvertedValue(null, keyType, entry.getKey(), isLenient);
 
-            // For value conversion, if the type argument is a ParameterizedType (e.g., Map<String, Object>),
-            // we need to pass that type information along
+            // If value type is parameterized, recursively handle it with type info
             Object convertedValue;
             if (valueTypeArg instanceof ParameterizedType) {
-                Field syntheticField = createSyntheticField(valueTypeArg);
-                convertedValue = getConvertedValue(syntheticField, valueType, entry.getValue(), isLenient);
+                convertedValue = getConvertedValueWithType(valueTypeArg, entry.getValue(), isLenient);
             } else {
                 convertedValue = getConvertedValue(null, valueType, entry.getValue(), isLenient);
             }
 
             result.put(convertedKey, convertedValue);
+        }
+        return result;
+    }
+
+    /**
+     * Handle Collection with explicit Type information
+     */
+    private static @NotNull Object handleCollectionValueWithType(
+            final @NotNull Type type, final Collection<?> collection, boolean isLenient) throws IOException {
+
+        Class<?> expectedType = getRawClass(type);
+        Collection<Object> result = createCollectionInstance(expectedType);
+
+        Type[] typeArgs = type instanceof ParameterizedType
+            ? ((ParameterizedType) type).getActualTypeArguments()
+            : new Type[0];
+
+        Type elementTypeArg = typeArgs.length > 0 ? typeArgs[0] : Object.class;
+        Class<?> elementType = getRawClass(elementTypeArg);
+
+        for (Object item : collection) {
+            // If element type is parameterized, recursively handle it with type info
+            Object convertedValue;
+            if (elementTypeArg instanceof ParameterizedType) {
+                convertedValue = getConvertedValueWithType(elementTypeArg, item, isLenient);
+            } else {
+                convertedValue = getConvertedValue(null, elementType, item, isLenient);
+            }
+            result.add(convertedValue);
+        }
+        return result;
+    }
+
+    /**
+     * Convert the incoming value into a Map with properly typed keys and values
+     */
+    private static @NotNull Object handleMapValue(
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
+
+        if (field != null && field.getGenericType() instanceof ParameterizedType) {
+            return handleMapValueWithType(field.getGenericType(), map, isLenient);
+        }
+
+        Map<Object, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            result.put(entry.getKey(), entry.getValue());
         }
         return result;
     }
