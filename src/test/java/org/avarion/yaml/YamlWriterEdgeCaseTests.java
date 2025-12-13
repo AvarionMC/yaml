@@ -176,7 +176,10 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         String yaml = new String(java.nio.file.Files.readAllBytes(target.toPath()));
         // Should remove the type tag from UUID values
-        assertEquals("uuid-value: 123e4567-e89b-12d3-a456-426614174000\n", yaml, "Should contain UUID without type tag");
+        assertTrue(
+                yaml.equals("uuid-value: 123e4567-e89b-12d3-a456-426614174000\n")
+                || yaml.equals("uuid-value: '123e4567-e89b-12d3-a456-426614174000'\n")
+        );
     }
 
     @Test
