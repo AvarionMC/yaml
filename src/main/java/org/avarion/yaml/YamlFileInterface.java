@@ -635,11 +635,11 @@ public abstract class YamlFileInterface {
         boolean first = true;
         for (Object item : list) {
             if (first) {
-                // First item gets the "- " prefix
-                splitAndAppend(yaml, formatValue(item), indentStr, "- ");
+                // First item gets double "- " prefix (one for outer list, one for inner list)
+                splitAndAppend(yaml, formatValue(item), indentStr, "- - ");
                 first = false;
             } else {
-                // Subsequent items are at the same indentation with "- "
+                // Subsequent items are indented 2 more spaces with "- "
                 splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
             }
         }
@@ -660,11 +660,11 @@ public abstract class YamlFileInterface {
         boolean first = true;
         for (Object item : items) {
             if (first) {
-                // First item gets the "- " prefix
-                splitAndAppend(yaml, formatValue(item), indentStr, "- ");
+                // First item gets double "- " prefix (one for outer list, one for inner set)
+                splitAndAppend(yaml, formatValue(item), indentStr, "- - ");
                 first = false;
             } else {
-                // Subsequent items are at the same indentation with "- "
+                // Subsequent items are indented 2 more spaces with "- "
                 splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
             }
         }
