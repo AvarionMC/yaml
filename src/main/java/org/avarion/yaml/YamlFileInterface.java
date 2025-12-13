@@ -586,8 +586,16 @@ public abstract class YamlFileInterface {
             }
             else if (value instanceof Set) {
                 yaml.append("\n");
-                List<?> sorted = ((Set<?>) value).stream().sorted().collect(Collectors.toList());
-                for (Object item : sorted) {
+                Set<?> set = (Set<?>) value;
+                // Only sort if elements are Comparable (e.g., String, Integer)
+                // Don't try to sort Maps or other non-comparable objects
+                List<?> items;
+                if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
+                    items = set.stream().sorted().collect(Collectors.toList());
+                } else {
+                    items = new ArrayList<>(set);
+                }
+                for (Object item : items) {
                     splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
                 }
             }
