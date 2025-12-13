@@ -201,6 +201,8 @@ public abstract class YamlFileInterface {
 
     /**
      * Convert a value using Type information (handles both Class and ParameterizedType)
+     * This method ONLY handles parameterized types (Maps/Collections with generic info).
+     * For simple types, it delegates to getConvertedValue to avoid code duplication.
      */
     private static @Nullable Object convertWithType(final @NotNull Type type, final Object value, boolean isLenient) throws IOException {
         Class<?> rawClass = getRawClass(type);
@@ -209,7 +211,7 @@ public abstract class YamlFileInterface {
             return handleNullValue(rawClass, null);
         }
 
-        // Handle Maps with type information
+        // Handle Maps with type information (only if type is parameterized)
         if (value instanceof Map && Map.class.isAssignableFrom(rawClass)) {
             Map<Object, Object> result = new LinkedHashMap<>();
 
@@ -230,7 +232,7 @@ public abstract class YamlFileInterface {
             return result;
         }
 
-        // Handle Collections with type information
+        // Handle Collections with type information (only if type is parameterized)
         if (value instanceof Collection && Collection.class.isAssignableFrom(rawClass)) {
             Collection<Object> result = createCollectionInstance(rawClass);
 
@@ -248,55 +250,10 @@ public abstract class YamlFileInterface {
             return result;
         }
 
-        // For simple types (primitives, String, enums, etc.), return as-is or convert
-        if (rawClass.isInstance(value)) {
-            return value;
-        }
-
-        // Handle enums
-        if (rawClass.isEnum() && value instanceof String) {
-            return stringToEnum((Class<? extends Enum>) rawClass, (String) value);
-        }
-
-        // Handle UUID
-        if (value instanceof String && rawClass.equals(UUID.class)) {
-            return UUID.fromString((String) value);
-        }
-
-        // Handle boolean conversion
-        if (isBooleanType(rawClass)) {
-            return convertToBoolean(value);
-        }
-
-        // Handle number conversion
-        if (value instanceof Number) {
-            return convertToNumber((Number) value, rawClass, isLenient);
-        }
-
-        // Handle character conversion
-        if (isCharacterType(rawClass)) {
-            return convertToCharacter(String.valueOf(value), isLenient);
-        }
-
-        // Try constructor that takes a String parameter
-        if (value instanceof String) {
-            try {
-                Constructor<?> constructor = rawClass.getConstructor(String.class);
-                return constructor.newInstance((String) value);
-            } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException ignored) {
-            }
-        }
-
-        // Try static field lookup
-        if (value instanceof String) {
-            try {
-                return getFieldValue(rawClass, (String) value);
-            } catch (IllegalAccessException | NoSuchFieldException ignored) {
-            }
-        }
-
-        // If all else fails, return the value as-is
-        return value;
+        // For all other types (primitives, String, enums, UUID, numbers, chars, etc.),
+        // delegate to getConvertedValue which has all the conversion logic in one place.
+        // This avoids code duplication.
+        return getConvertedValue(null, rawClass, value, isLenient);
     }
 
     private static Collection<Object> createCollectionInstance(@NotNull Class<?> expectedType) throws IOException {
