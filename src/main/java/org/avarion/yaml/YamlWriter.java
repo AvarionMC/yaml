@@ -28,7 +28,7 @@ class YamlWriter {
      */
     public String write(Map<Object, Object> nestedMap) {
         StringBuilder result = new StringBuilder();
-        writeValue(result, nestedMap, "");
+        writeValue(result, nestedMap, "", "");
         return result.toString();
     }
 
@@ -36,9 +36,9 @@ class YamlWriter {
      * SINGLE DISPATCHER: Decides what type to write (Map, Collection, or scalar)
      * This is the ONLY place where we check the type of a value.
      */
-    private void writeValue(StringBuilder yaml, Object value, String indent) {
+    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) {
         if (value instanceof Map) {
-            writeMap(yaml, (Map<?, ?>) value, indent);
+            writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
         } else if (value instanceof Collection) {
             writeCollection(yaml, (Collection<?>) value, indent);
         } else {
@@ -46,20 +46,11 @@ class YamlWriter {
         }
     }
 
-    void addIfNotSame(@NotNull StringBuilder yaml, @Nullable Character charToAdd) {
-        if (charToAdd == null) {
-            return;
-        }
-
-        if (yaml.length() == 0 || yaml.charAt(yaml.length() - 1) != charToAdd) {
-            yaml.append(charToAdd);
-        }
-    }
-
     /**
      * Primitive building block: Write a Map
      */
-    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String indent) {
+    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String firstIndent, String indent) {
+        boolean firstEntry = true;
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
             Object value = entry.getValue();
@@ -70,9 +61,11 @@ class YamlWriter {
                 appendComment(yaml, node.comment, indent);
                 value = node.value;
             }
+            yaml.append(firstEntry ? firstIndent : indent);
+            firstEntry = false;
 
-            yaml.append(indent).append(key).append(":\n");
-            writeValue(yaml, value, indent + "  ");
+            yaml.append(key).append(":\n");
+            writeValue(yaml, value, indent + "  ", indent + "  ");
         }
     }
 
@@ -82,8 +75,11 @@ class YamlWriter {
     private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) {
         List<?> items = normalizeCollection(collection);
         for (Object item : items) {
-            yaml.append(indent).append("- ");
-            writeValue(yaml, item, indent + "  ");
+            if (!yaml.subSequence(yaml.length() - 2, yaml.length()).equals("- ")) {
+                yaml.append(indent);
+            }
+            yaml.append("- ");
+            writeValue(yaml, item, "", indent + "  ");
         }
     }
 
@@ -169,32 +165,11 @@ class YamlWriter {
         if (comment == null || comment.isEmpty()) {
             return;
         }
-        appendLines(yaml, comment, indent, "# ");
-    }
 
-    /**
-     * Primitive building block: Append multi-line content with prefix
-     */
-    private void appendLines(StringBuilder yaml, @Nullable String content, String indent, String prefix) {
-        if (content == null) {
-            return;
-        }
-
-        for (String line : content.split("\\r?\\n")) {
-            yaml.append(indent).append(prefix)
+        for (String line : comment.split("\\r?\\n")) {
+            yaml.append(indent).append("# ")
                 .append(line.replaceAll("\\s*$", ""))
                 .append("\n");
         }
-    }
-
-    /**
-     * Primitive building block: Build indentation string for a given level
-     */
-    private String buildIndent(int level) {
-        StringBuilder indent = new StringBuilder();
-        for (int i = 0; i < level; i++) {
-            indent.append("  ");
-        }
-        return indent.toString();
     }
 }
