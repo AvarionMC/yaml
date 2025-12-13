@@ -136,17 +136,18 @@ public abstract class YamlFileInterface {
     }
 
     /**
-     * Extract generic type arguments from a field's parameterized type
+     * Extract the raw Class from a Type, handling both Class and ParameterizedType
      */
-    @Contract("null -> new")
-    private static Type @NotNull [] extractGenericTypeArguments(final @Nullable Field field) {
-        if (field!=null) {
-            Type genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType) {
-                return ((ParameterizedType) genericType).getActualTypeArguments();
+    private static Class<?> getRawClass(Type type) {
+        if (type instanceof Class<?>) {
+            return (Class<?>) type;
+        } else if (type instanceof ParameterizedType) {
+            Type rawType = ((ParameterizedType) type).getRawType();
+            if (rawType instanceof Class<?>) {
+                return (Class<?>) rawType;
             }
         }
-        return new Type[0];
+        return Object.class;
     }
 
     /**
@@ -157,11 +158,17 @@ public abstract class YamlFileInterface {
 
         Collection<Object> result = createCollectionInstance(expectedType);
 
-        Type[] typeArgs = extractGenericTypeArguments(field);
-        Class<?> elementType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
+        // Extract element type from Field's generic type if available
+        Type elementType = Object.class;
+        if (field != null && field.getGenericType() instanceof ParameterizedType) {
+            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
+            if (typeArgs.length > 0) {
+                elementType = typeArgs[0];
+            }
+        }
 
         for (Object item : collection) {
-            Object convertedValue = getConvertedValue(null, elementType, item, isLenient);
+            Object convertedValue = convertWithType(elementType, item, isLenient);
             result.add(convertedValue);
         }
         return result;
@@ -175,16 +182,78 @@ public abstract class YamlFileInterface {
 
         Map<Object, Object> result = new LinkedHashMap<>();
 
-        Type[] typeArgs = extractGenericTypeArguments(field);
-        Class<?> keyType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
-        Class<?> valueType = typeArgs.length > 1 ? (Class<?>) typeArgs[1] : Object.class;
+        // Extract key/value types from Field's generic type if available
+        Type keyType = Object.class;
+        Type valueType = Object.class;
+        if (field != null && field.getGenericType() instanceof ParameterizedType) {
+            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
+            if (typeArgs.length > 0) keyType = typeArgs[0];
+            if (typeArgs.length > 1) valueType = typeArgs[1];
+        }
 
         for (Map.Entry<?, ?> entry : map.entrySet()) {
-            Object convertedKey = getConvertedValue(null, keyType, entry.getKey(), isLenient);
-            Object convertedValue = getConvertedValue(null, valueType, entry.getValue(), isLenient);
+            Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
+            Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
             result.put(convertedKey, convertedValue);
         }
         return result;
+    }
+
+    /**
+     * Convert a value using Type information (handles both Class and ParameterizedType)
+     * This method ONLY handles parameterized types (Maps/Collections with generic info).
+     * For simple types, it delegates to getConvertedValue to avoid code duplication.
+     */
+    private static @Nullable Object convertWithType(final @NotNull Type type, final Object value, boolean isLenient) throws IOException {
+        Class<?> rawClass = getRawClass(type);
+
+        if (value == null) {
+            return handleNullValue(rawClass, null);
+        }
+
+        // Handle Maps with type information (only if type is parameterized)
+        if (value instanceof Map && Map.class.isAssignableFrom(rawClass)) {
+            Map<Object, Object> result = new LinkedHashMap<>();
+
+            // Extract type arguments if this is a ParameterizedType
+            Type keyType = Object.class;
+            Type valueType = Object.class;
+            if (type instanceof ParameterizedType) {
+                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
+                if (typeArgs.length > 0) keyType = typeArgs[0];
+                if (typeArgs.length > 1) valueType = typeArgs[1];
+            }
+
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
+                Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
+                result.put(convertedKey, convertedValue);
+            }
+            return result;
+        }
+
+        // Handle Collections with type information (only if type is parameterized)
+        if (value instanceof Collection && Collection.class.isAssignableFrom(rawClass)) {
+            Collection<Object> result = createCollectionInstance(rawClass);
+
+            // Extract element type if this is a ParameterizedType
+            Type elementType = Object.class;
+            if (type instanceof ParameterizedType) {
+                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
+                if (typeArgs.length > 0) elementType = typeArgs[0];
+            }
+
+            for (Object item : (Collection<?>) value) {
+                Object convertedItem = convertWithType(elementType, item, isLenient);
+                result.add(convertedItem);
+            }
+            return result;
+        }
+
+        // For all other types (primitives, String, enums, UUID, numbers, chars, etc.),
+        // delegate to getConvertedValue which has all the conversion logic in one place.
+        // This avoids code duplication.
+        return getConvertedValue(null, rawClass, value, isLenient);
     }
 
     private static Collection<Object> createCollectionInstance(@NotNull Class<?> expectedType) throws IOException {
@@ -497,6 +566,57 @@ public abstract class YamlFileInterface {
         }
     }
 
+    /**
+     * Write a map as an item in a list/set with proper YAML formatting
+     */
+    private void writeMapItemInList(final StringBuilder yaml, final Map<?, ?> map, final String indentStr) {
+        boolean first = true;
+        for (Map.Entry<?, ?> mapEntry : map.entrySet()) {
+            if (first) {
+                // First key gets the "- " prefix
+                yaml.append(indentStr).append("- ").append(mapEntry.getKey()).append(": ")
+                    .append(formatValue(mapEntry.getValue())).append('\n');
+                first = false;
+            } else {
+                // Subsequent keys are indented at the same level as the first key's value
+                yaml.append(indentStr).append("  ").append(mapEntry.getKey()).append(": ")
+                    .append(formatValue(mapEntry.getValue())).append('\n');
+            }
+        }
+    }
+
+    /**
+     * Write a collection (List, Set, etc.) as an item in a list/set with proper YAML formatting
+     */
+    private void writeCollectionItemInList(final StringBuilder yaml, final Collection<?> collection, final String indentStr) {
+        // Convert collection to list, sorting Sets if elements are comparable
+        List<?> items;
+        if (collection instanceof Set) {
+            Set<?> set = (Set<?>) collection;
+            // Only sort if elements are Comparable
+            if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
+                items = set.stream().sorted().collect(Collectors.toList());
+            } else {
+                items = new ArrayList<>(set);
+            }
+        } else {
+            // For List, Queue, or other Collection types, preserve order
+            items = new ArrayList<>(collection);
+        }
+
+        boolean first = true;
+        for (Object item : items) {
+            if (first) {
+                // First item gets double "- " prefix (one for outer collection, one for inner collection)
+                splitAndAppend(yaml, formatValue(item), indentStr, "- - ");
+                first = false;
+            } else {
+                // Subsequent items are indented 2 more spaces with "- "
+                splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+            }
+        }
+    }
+
     private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<Object, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
@@ -520,17 +640,35 @@ public abstract class YamlFileInterface {
                 yaml.append("\n");
                 convertNestedMapToYaml(yaml, (Map<Object, Object>) value, indent + 1);
             }
-            else if (value instanceof List) {
+            else if (value instanceof Collection) {
                 yaml.append("\n");
-                for (Object item : (List<?>) value) {
-                    splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+
+                // Convert collection to list, sorting Sets if elements are comparable
+                Collection<?> collection = (Collection<?>) value;
+                List<?> items;
+                if (value instanceof Set) {
+                    Set<?> set = (Set<?>) value;
+                    // Only sort if elements are Comparable (e.g., String, Integer)
+                    // Don't try to sort Maps or other non-comparable objects
+                    if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
+                        items = set.stream().sorted().collect(Collectors.toList());
+                    } else {
+                        items = new ArrayList<>(set);
+                    }
+                } else {
+                    // For List, Queue, or other Collection types, preserve order
+                    items = new ArrayList<>(collection);
                 }
-            }
-            else if (value instanceof Set) {
-                yaml.append("\n");
-                List<?> sorted = ((Set<?>) value).stream().sorted().collect(Collectors.toList());
-                for (Object item : sorted) {
-                    splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+
+                // Write each item with appropriate handler based on type
+                for (Object item : items) {
+                    if (item instanceof Map) {
+                        writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
+                    } else if (item instanceof Collection) {
+                        writeCollectionItemInList(yaml, (Collection<?>) item, indentStr + "  ");
+                    } else {
+                        splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+                    }
                 }
             }
             else {
