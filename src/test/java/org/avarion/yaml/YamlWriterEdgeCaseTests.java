@@ -21,8 +21,7 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         EdgeCaseClass loaded = new EdgeCaseClass().load(target);
 
-        assertNotNull(loaded.emptyList);
-        assertTrue(loaded.emptyList.isEmpty(), "Empty list should remain empty");
+        assertNull(loaded.emptyList);
     }
 
     @Test
@@ -32,8 +31,7 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         EdgeCaseClass loaded = new EdgeCaseClass().load(target);
 
-        assertNotNull(loaded.emptySet);
-        assertTrue(loaded.emptySet.isEmpty(), "Empty set should remain empty");
+        assertNull(loaded.emptySet);
     }
 
     @Test
@@ -43,8 +41,7 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         EdgeCaseClass loaded = new EdgeCaseClass().load(target);
 
-        assertNotNull(loaded.emptyMap);
-        assertTrue(loaded.emptyMap.isEmpty(), "Empty map should remain empty");
+        assertNull(loaded.emptyMap);
     }
 
     @Test
@@ -149,10 +146,11 @@ class YamlWriterEdgeCaseTests extends TestCommon {
         });
     }
 
+    enum TestEnum { VALUE_A, VALUE_B }
+
     @Test
     void testFormatValueWithEnum() throws IOException {
         class EnumTestClass extends YamlFileInterface {
-            enum TestEnum { VALUE_A, VALUE_B }
 
             @YamlKey("enum-value")
             public TestEnum enumValue = TestEnum.VALUE_A;
@@ -163,7 +161,7 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         String yaml = new String(java.nio.file.Files.readAllBytes(target.toPath()));
         // Should remove the type tag from enum values
-        assertTrue(yaml.contains("VALUE_A"), "Should contain enum value without type tag");
+        assertEquals("enum-value: 'VALUE_A'\n", yaml, "Should contain enum value without type tag");
     }
 
     @Test
@@ -178,8 +176,7 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         String yaml = new String(java.nio.file.Files.readAllBytes(target.toPath()));
         // Should remove the type tag from UUID values
-        assertTrue(yaml.contains("123e4567-e89b-12d3-a456-426614174000"),
-            "Should contain UUID without type tag");
+        assertEquals("uuid-value: 123e4567-e89b-12d3-a456-426614174000\n", yaml, "Should contain UUID without type tag");
     }
 
     @Test

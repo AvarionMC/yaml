@@ -18,8 +18,7 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class YamlWriter {
-    private static final Pattern GENERIC_TOSTRING_PATTERN =
-        Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
+    private static final Pattern GENERIC_TOSTRING_PATTERN = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
 
     private final YamlWrapper yamlWrapper;
 
@@ -39,9 +38,11 @@ class YamlWriter {
     private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) {
         if (value instanceof Map) {
             writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
-        } else if (value instanceof Collection) {
+        }
+        else if (value instanceof Collection) {
             writeCollection(yaml, (Collection<?>) value, indent);
-        } else {
+        }
+        else {
             writeScalar(yaml, value);
         }
     }
@@ -61,7 +62,7 @@ class YamlWriter {
                 appendComment(yaml, node.comment, indent);
                 value = node.value;
             }
-            yaml.append(firstEntry ? firstIndent : indent);
+            yaml.append(firstEntry ? firstIndent:indent);
             firstEntry = false;
 
             yaml.append(key).append(":\n");
@@ -87,10 +88,10 @@ class YamlWriter {
      * Primitive building block: Write a scalar value (just the formatted value, no newline)
      */
     private void writeScalar(@NotNull StringBuilder yaml, Object value) {
-        if (yaml.charAt(yaml.length() - 1) == '\n') {
+        if (yaml.charAt(yaml.length() - 1)=='\n') {
             yaml.deleteCharAt(yaml.length() - 1);
         }
-        if (yaml.charAt(yaml.length() - 1) != ' ') {
+        if (yaml.charAt(yaml.length() - 1)!=' ') {
             yaml.append(' ');
         }
         yaml.append(formatValue(value));
@@ -119,7 +120,8 @@ class YamlWriter {
         if (value instanceof Enum || value instanceof UUID) {
             // Remove the type tag: !!org.avarion.yaml.Material 'A' --> 'A'
             return yamlContent.replaceAll("^!!\\S+\\s+", "");
-        } else {
+        }
+        else {
             // Check for generic toString() pattern and try to find static field name
             Matcher matcher = GENERIC_TOSTRING_PATTERN.matcher(yamlContent);
             if (matcher.matches()) {
@@ -141,18 +143,17 @@ class YamlWriter {
             Class<?> clazz = value.getClass();
 
             return Arrays.stream(clazz.getDeclaredFields())
-                .filter(field -> Modifier.isStatic(field.getModifiers())
-                    && Modifier.isPublic(field.getModifiers()))
-                .filter(field -> {
-                    try {
-                        field.setAccessible(true);
-                        return field.get(null) == value;
-                    } catch (IllegalAccessException e) {
-                        return false;
-                    }
-                })
-                .map(Field::getName)
-                .findFirst();
+                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
+                         .filter(field -> {
+                             try {
+                                 field.setAccessible(true);
+                                 return field.get(null)==value;
+                             } catch (IllegalAccessException e) {
+                                 return false;
+                             }
+                         })
+                         .map(Field::getName)
+                         .findFirst();
         } catch (Exception e) {
             return Optional.empty();
         }
@@ -162,14 +163,12 @@ class YamlWriter {
      * Primitive building block: Append a comment with proper indentation
      */
     private void appendComment(StringBuilder yaml, @Nullable String comment, String indent) {
-        if (comment == null || comment.isEmpty()) {
+        if (comment==null || comment.isEmpty()) {
             return;
         }
 
         for (String line : comment.split("\\r?\\n")) {
-            yaml.append(indent).append("# ")
-                .append(line.replaceAll("\\s*$", ""))
-                .append("\n");
+            yaml.append(indent).append("# ").append(line.replaceAll("\\s*$", "")).append("\n");
         }
     }
 }
