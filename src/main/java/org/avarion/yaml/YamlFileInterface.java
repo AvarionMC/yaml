@@ -158,13 +158,58 @@ public abstract class YamlFileInterface {
         Collection<Object> result = createCollectionInstance(expectedType);
 
         Type[] typeArgs = extractGenericTypeArguments(field);
-        Class<?> elementType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
+        Type elementTypeArg = typeArgs.length > 0 ? typeArgs[0] : Object.class;
+        Class<?> elementType = getRawClass(elementTypeArg);
 
         for (Object item : collection) {
-            Object convertedValue = getConvertedValue(null, elementType, item, isLenient);
+            // For element conversion, if the type argument is a ParameterizedType (e.g., Map<String, Object>),
+            // we need to pass that type information along
+            Object convertedValue;
+            if (elementTypeArg instanceof ParameterizedType) {
+                Field syntheticField = createSyntheticField(elementTypeArg);
+                convertedValue = getConvertedValue(syntheticField, elementType, item, isLenient);
+            } else {
+                convertedValue = getConvertedValue(null, elementType, item, isLenient);
+            }
             result.add(convertedValue);
         }
         return result;
+    }
+
+    /**
+     * Extract the raw Class from a Type, handling both Class and ParameterizedType
+     */
+    private static Class<?> getRawClass(Type type) {
+        if (type instanceof Class<?>) {
+            return (Class<?>) type;
+        } else if (type instanceof ParameterizedType) {
+            Type rawType = ((ParameterizedType) type).getRawType();
+            if (rawType instanceof Class<?>) {
+                return (Class<?>) rawType;
+            }
+        }
+        return Object.class;
+    }
+
+    /**
+     * Create a synthetic Field to carry generic type information for nested types
+     */
+    private static Field createSyntheticField(Type type) {
+        try {
+            // Create a temporary class with a field of the desired type
+            class TypeCarrier {
+                @SuppressWarnings("unused")
+                Object field;
+            }
+            Field syntheticField = TypeCarrier.class.getDeclaredField("field");
+            // Use reflection to set the generic type
+            Field genericTypeField = Field.class.getDeclaredField("genericType");
+            genericTypeField.setAccessible(true);
+            genericTypeField.set(syntheticField, type);
+            return syntheticField;
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            return null;
+        }
     }
 
     /**
@@ -176,12 +221,25 @@ public abstract class YamlFileInterface {
         Map<Object, Object> result = new LinkedHashMap<>();
 
         Type[] typeArgs = extractGenericTypeArguments(field);
-        Class<?> keyType = typeArgs.length > 0 ? (Class<?>) typeArgs[0] : Object.class;
-        Class<?> valueType = typeArgs.length > 1 ? (Class<?>) typeArgs[1] : Object.class;
+        Type keyTypeArg = typeArgs.length > 0 ? typeArgs[0] : Object.class;
+        Type valueTypeArg = typeArgs.length > 1 ? typeArgs[1] : Object.class;
+
+        Class<?> keyType = getRawClass(keyTypeArg);
+        Class<?> valueType = getRawClass(valueTypeArg);
 
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object convertedKey = getConvertedValue(null, keyType, entry.getKey(), isLenient);
-            Object convertedValue = getConvertedValue(null, valueType, entry.getValue(), isLenient);
+
+            // For value conversion, if the type argument is a ParameterizedType (e.g., Map<String, Object>),
+            // we need to pass that type information along
+            Object convertedValue;
+            if (valueTypeArg instanceof ParameterizedType) {
+                Field syntheticField = createSyntheticField(valueTypeArg);
+                convertedValue = getConvertedValue(syntheticField, valueType, entry.getValue(), isLenient);
+            } else {
+                convertedValue = getConvertedValue(null, valueType, entry.getValue(), isLenient);
+            }
+
             result.put(convertedKey, convertedValue);
         }
         return result;
