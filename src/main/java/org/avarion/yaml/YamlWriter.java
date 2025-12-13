@@ -28,7 +28,7 @@ class YamlWriter {
      */
     public String write(Map<Object, Object> nestedMap) {
         StringBuilder result = new StringBuilder();
-        writeMap(result, nestedMap, 0);
+        writeValue(result, nestedMap, "");
         return result.toString();
     }
 
@@ -36,22 +36,30 @@ class YamlWriter {
      * SINGLE DISPATCHER: Decides what type to write (Map, Collection, or scalar)
      * This is the ONLY place where we check the type of a value.
      */
-    private void writeValue(StringBuilder yaml, Object value, int indentLevel) {
+    private void writeValue(StringBuilder yaml, Object value, String indent) {
         if (value instanceof Map) {
-            writeMap(yaml, (Map<?, ?>) value, indentLevel);
+            writeMap(yaml, (Map<?, ?>) value, indent);
         } else if (value instanceof Collection) {
-            writeCollection(yaml, (Collection<?>) value, indentLevel);
+            writeCollection(yaml, (Collection<?>) value, indent);
         } else {
             writeScalar(yaml, value);
+        }
+    }
+
+    void addIfNotSame(@NotNull StringBuilder yaml, @Nullable Character charToAdd) {
+        if (charToAdd == null) {
+            return;
+        }
+
+        if (yaml.length() == 0 || yaml.charAt(yaml.length() - 1) != charToAdd) {
+            yaml.append(charToAdd);
         }
     }
 
     /**
      * Primitive building block: Write a Map
      */
-    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, int indentLevel) {
-        String indent = buildIndent(indentLevel);
-
+    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String indent) {
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
             Object value = entry.getValue();
@@ -63,88 +71,34 @@ class YamlWriter {
                 value = node.value;
             }
 
-            // Write the key
-            yaml.append(indent).append(key).append(":");
-
-            // Decide how to write the value (inline vs newline)
-            if (value instanceof Map || value instanceof Collection) {
-                yaml.append("\n");
-                writeValue(yaml, value, indentLevel + 1);
-            } else {
-                yaml.append(' ');
-                writeScalar(yaml, value);
-                yaml.append('\n');
-            }
+            yaml.append(indent).append(key).append(":\n");
+            writeValue(yaml, value, indent + "  ");
         }
     }
 
     /**
      * Primitive building block: Write a Collection
      */
-    private void writeCollection(StringBuilder yaml, Collection<?> collection, int indentLevel) {
+    private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) {
         List<?> items = normalizeCollection(collection);
-        String indent = buildIndent(indentLevel);
-
         for (Object item : items) {
             yaml.append(indent).append("- ");
-            writeAsListItem(yaml, item, indentLevel + 1);
-        }
-    }
-
-    /**
-     * Helper: Write a value as a list item (after "- " has been written)
-     */
-    private void writeAsListItem(StringBuilder yaml, Object item, int indentLevel) {
-        if (item instanceof Map) {
-            writeMapInline(yaml, (Map<?, ?>) item, buildIndent(indentLevel));
-        } else if (item instanceof Collection) {
-            writeNestedCollection(yaml, (Collection<?>) item, indentLevel);
-        } else {
-            writeScalar(yaml, item);
-            yaml.append('\n');
-        }
-    }
-
-    /**
-     * Write a map inline (for maps that are list items)
-     * Example: - key1: val1\n  key2: val2
-     */
-    private void writeMapInline(StringBuilder yaml, Map<?, ?> map, String indent) {
-        boolean firstKey = true;
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            if (!firstKey) {
-                yaml.append(indent);
-            }
-            yaml.append(entry.getKey()).append(": ")
-                .append(formatValue(entry.getValue())).append('\n');
-            firstKey = false;
-        }
-    }
-
-    /**
-     * Write a nested collection (collection as a list item)
-     * Example: - - item1\n  - item2
-     */
-    private void writeNestedCollection(StringBuilder yaml, Collection<?> collection, int indentLevel) {
-        List<?> items = normalizeCollection(collection);
-        boolean firstItem = true;
-
-        for (Object item : items) {
-            if (!firstItem) {
-                yaml.append(buildIndent(indentLevel));
-            }
-            yaml.append("- ");
-            writeScalar(yaml, item);
-            yaml.append('\n');
-            firstItem = false;
+            writeValue(yaml, item, indent + "  ");
         }
     }
 
     /**
      * Primitive building block: Write a scalar value (just the formatted value, no newline)
      */
-    private void writeScalar(StringBuilder yaml, Object value) {
+    private void writeScalar(@NotNull StringBuilder yaml, Object value) {
+        if (yaml.charAt(yaml.length() - 1) == '\n') {
+            yaml.deleteCharAt(yaml.length() - 1);
+        }
+        if (yaml.charAt(yaml.length() - 1) != ' ') {
+            yaml.append(' ');
+        }
         yaml.append(formatValue(value));
+        yaml.append('\n');
     }
 
     /**
