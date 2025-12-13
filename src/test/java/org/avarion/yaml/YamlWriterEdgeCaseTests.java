@@ -199,4 +199,17 @@ class YamlWriterEdgeCaseTests extends TestCommon {
         // Should handle any exceptions gracefully during YAML serialization
         assertDoesNotThrow(() -> config.save(target));
     }
+
+    @Test
+    void testEmptyComment() throws IOException {
+        class EmptyCommentClass extends YamlFileInterface {
+            @YamlComment()
+            @YamlKey("comment")
+            public String comment = "";
+        }
+
+        EmptyCommentClass test = new EmptyCommentClass();
+        test.save(target);
+        assertEquals("", test.comment);
+    }
 }
