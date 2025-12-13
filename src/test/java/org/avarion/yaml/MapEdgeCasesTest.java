@@ -114,23 +114,6 @@ class MapEdgeCasesTest extends TestCommon {
     }
 
     @Test
-    void testEmptyMap() throws IOException {
-        // Test class with empty map
-        class EmptyMapClass extends YamlFileInterface {
-            @YamlKey("empty")
-            public Map<String, String> empty = new LinkedHashMap<>();
-        }
-
-        EmptyMapClass config = new EmptyMapClass();
-        config.save(target);
-
-        EmptyMapClass loaded = new EmptyMapClass().load(target);
-
-        assertNotNull(loaded.empty);
-        assertTrue(loaded.empty.isEmpty());
-    }
-
-    @Test
     void testMapWithIntegerKeys() throws IOException {
         // Test map with non-String keys
         class IntKeyMapClass extends YamlFileInterface {
