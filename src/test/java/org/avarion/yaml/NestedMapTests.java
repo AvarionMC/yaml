@@ -257,4 +257,101 @@ class NestedMapTests extends TestCommon {
         assertTrue(foundTypeA, "Set should contain map with type A");
         assertTrue(foundTypeB, "Set should contain map with type B");
     }
+
+    @Test
+    void testMapWithListValues() throws IOException {
+        // Test Map<String, List<Integer>> - this hits collection handling in convertWithType
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the map with list values
+        assertNotNull(loaded.mapWithListValues);
+        assertEquals(2, loaded.mapWithListValues.size());
+
+        java.util.List<Integer> team1 = loaded.mapWithListValues.get("team1");
+        assertNotNull(team1);
+        assertEquals(3, team1.size());
+        assertEquals(10, team1.get(0));
+        assertEquals(20, team1.get(1));
+        assertEquals(30, team1.get(2));
+
+        java.util.List<Integer> team2 = loaded.mapWithListValues.get("team2");
+        assertNotNull(team2);
+        assertEquals(2, team2.size());
+        assertEquals(40, team2.get(0));
+        assertEquals(50, team2.get(1));
+    }
+
+    @Test
+    void testListOfLists() throws IOException {
+        // Test List<List<String>> - this hits collection handling in convertWithType
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the list of lists
+        assertNotNull(loaded.listOfLists);
+        assertEquals(2, loaded.listOfLists.size());
+
+        java.util.List<String> sublist1 = loaded.listOfLists.get(0);
+        assertNotNull(sublist1);
+        assertEquals(3, sublist1.size());
+        assertEquals("a", sublist1.get(0));
+        assertEquals("b", sublist1.get(1));
+        assertEquals("c", sublist1.get(2));
+
+        java.util.List<String> sublist2 = loaded.listOfLists.get(1);
+        assertNotNull(sublist2);
+        assertEquals(2, sublist2.size());
+        assertEquals("d", sublist2.get(0));
+        assertEquals("e", sublist2.get(1));
+    }
+
+    @Test
+    void testMapWithSetValues() throws IOException {
+        // Test Map<String, Set<String>> - this hits collection handling in convertWithType
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the map with set values
+        assertNotNull(loaded.mapWithSetValues);
+        assertEquals(2, loaded.mapWithSetValues.size());
+
+        Set<String> tags1 = loaded.mapWithSetValues.get("group1");
+        assertNotNull(tags1);
+        assertEquals(2, tags1.size());
+        assertTrue(tags1.contains("tag1"));
+        assertTrue(tags1.contains("tag2"));
+
+        Set<String> tags2 = loaded.mapWithSetValues.get("group2");
+        assertNotNull(tags2);
+        assertEquals(2, tags2.size());
+        assertTrue(tags2.contains("tag3"));
+        assertTrue(tags2.contains("tag4"));
+    }
+
+    @Test
+    void testMapWithListValuesModification() throws IOException {
+        // Test modification of list values in map
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Modify a list value
+        replaceInTarget("10", "999");
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the modification
+        java.util.List<Integer> team1 = loaded.mapWithListValues.get("team1");
+        assertEquals(999, team1.get(0));
+    }
 }

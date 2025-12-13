@@ -30,6 +30,18 @@ public class NestedMapClass extends YamlFileInterface {
     @YamlKey("set-of-maps")
     public Set<Map<String, String>> setOfMaps = new LinkedHashSet<>();
 
+    // Test for Map with List values: Map<String, List<Integer>>
+    @YamlKey("map-with-list-values")
+    public Map<String, List<Integer>> mapWithListValues = new LinkedHashMap<>();
+
+    // Test for List of Lists: List<List<String>>
+    @YamlKey("list-of-lists")
+    public List<List<String>> listOfLists = new ArrayList<>();
+
+    // Test for Map with Set values: Map<String, Set<String>>
+    @YamlKey("map-with-set-values")
+    public Map<String, Set<String>> mapWithSetValues = new LinkedHashMap<>();
+
     public NestedMapClass() {
         // Initialize with some default values
         Map<String, Object> innerMap1 = new HashMap<>();
@@ -113,5 +125,43 @@ public class NestedMapClass extends YamlFileInterface {
 
         setOfMaps.add(setMap1);
         setOfMaps.add(setMap2);
+
+        // For map with list values
+        List<Integer> scores1 = new ArrayList<>();
+        scores1.add(10);
+        scores1.add(20);
+        scores1.add(30);
+
+        List<Integer> scores2 = new ArrayList<>();
+        scores2.add(40);
+        scores2.add(50);
+
+        mapWithListValues.put("team1", scores1);
+        mapWithListValues.put("team2", scores2);
+
+        // For list of lists
+        List<String> sublist1 = new ArrayList<>();
+        sublist1.add("a");
+        sublist1.add("b");
+        sublist1.add("c");
+
+        List<String> sublist2 = new ArrayList<>();
+        sublist2.add("d");
+        sublist2.add("e");
+
+        listOfLists.add(sublist1);
+        listOfLists.add(sublist2);
+
+        // For map with set values
+        Set<String> tags1 = new LinkedHashSet<>();
+        tags1.add("tag1");
+        tags1.add("tag2");
+
+        Set<String> tags2 = new LinkedHashSet<>();
+        tags2.add("tag3");
+        tags2.add("tag4");
+
+        mapWithSetValues.put("group1", tags1);
+        mapWithSetValues.put("group2", tags2);
     }
 }
