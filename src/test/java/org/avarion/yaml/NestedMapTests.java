@@ -140,4 +140,121 @@ class NestedMapTests extends TestCommon {
         assertEquals("newValue", outer3.get("newKey"));
         assertEquals(123, outer3.get("anotherKey"));
     }
+
+    @Test
+    void testDeepNestedMap() throws IOException {
+        // Create and save a config with 3-level deep nested map
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the 3-level deep nested map structure
+        assertNotNull(loaded.deepNestedMap);
+        assertEquals(2, loaded.deepNestedMap.size());
+
+        // Check level1-a -> deep1 -> value
+        assertTrue(loaded.deepNestedMap.containsKey("level1-a"));
+        Map<String, Map<String, Object>> level1a = loaded.deepNestedMap.get("level1-a");
+        assertNotNull(level1a);
+        assertEquals(2, level1a.size());
+
+        Map<String, Object> deep1 = level1a.get("deep1");
+        assertNotNull(deep1);
+        assertEquals("deep1", deep1.get("value"));
+        assertEquals(123, deep1.get("number"));
+
+        Map<String, Object> deep2 = level1a.get("deep2");
+        assertNotNull(deep2);
+        assertEquals("deep2", deep2.get("value"));
+        assertEquals(true, deep2.get("flag"));
+
+        // Check level1-b -> deep3 -> value
+        assertTrue(loaded.deepNestedMap.containsKey("level1-b"));
+        Map<String, Map<String, Object>> level1b = loaded.deepNestedMap.get("level1-b");
+        assertNotNull(level1b);
+        assertEquals(1, level1b.size());
+
+        Map<String, Object> deep3 = level1b.get("deep3");
+        assertNotNull(deep3);
+        assertEquals("deep3", deep3.get("value"));
+    }
+
+    @Test
+    void testListOfMaps() throws IOException {
+        // Create and save a config with list of maps
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the list of maps structure
+        assertNotNull(loaded.listOfMaps);
+        assertEquals(2, loaded.listOfMaps.size());
+
+        // Check first map
+        Map<String, Object> map1 = loaded.listOfMaps.get(0);
+        assertNotNull(map1);
+        assertEquals(1, map1.get("id"));
+        assertEquals("first", map1.get("name"));
+
+        // Check second map
+        Map<String, Object> map2 = loaded.listOfMaps.get(1);
+        assertNotNull(map2);
+        assertEquals(2, map2.get("id"));
+        assertEquals("second", map2.get("name"));
+    }
+
+    @Test
+    void testListOfMapsModification() throws IOException {
+        // Create and save a config
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Modify a value in the list
+        replaceInTarget("first", "modified");
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the modification
+        Map<String, Object> map1 = loaded.listOfMaps.get(0);
+        assertEquals("modified", map1.get("name"));
+    }
+
+    @Test
+    void testSetOfMaps() throws IOException {
+        // Create and save a config with set of maps
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the set of maps structure
+        assertNotNull(loaded.setOfMaps);
+        assertEquals(2, loaded.setOfMaps.size());
+
+        // Convert to list for easier testing (order doesn't matter in set)
+        java.util.List<Map<String, String>> setAsList = new java.util.ArrayList<>(loaded.setOfMaps);
+
+        // Verify both maps are present with correct data
+        boolean foundTypeA = false;
+        boolean foundTypeB = false;
+
+        for (Map<String, String> map : setAsList) {
+            if ("A".equals(map.get("type"))) {
+                foundTypeA = true;
+                assertEquals("cat1", map.get("category"));
+            } else if ("B".equals(map.get("type"))) {
+                foundTypeB = true;
+                assertEquals("cat2", map.get("category"));
+            }
+        }
+
+        assertTrue(foundTypeA, "Set should contain map with type A");
+        assertTrue(foundTypeB, "Set should contain map with type B");
+    }
 }
