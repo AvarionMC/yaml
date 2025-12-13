@@ -555,6 +555,25 @@ public abstract class YamlFileInterface {
         }
     }
 
+    /**
+     * Write a map as an item in a list/set with proper YAML formatting
+     */
+    private void writeMapItemInList(final StringBuilder yaml, final Map<?, ?> map, final String indentStr) {
+        boolean first = true;
+        for (Map.Entry<?, ?> mapEntry : map.entrySet()) {
+            if (first) {
+                // First key gets the "- " prefix
+                yaml.append(indentStr).append("- ").append(mapEntry.getKey()).append(": ")
+                    .append(formatValue(mapEntry.getValue())).append('\n');
+                first = false;
+            } else {
+                // Subsequent keys are indented at the same level as the first key's value
+                yaml.append(indentStr).append("  ").append(mapEntry.getKey()).append(": ")
+                    .append(formatValue(mapEntry.getValue())).append('\n');
+            }
+        }
+    }
+
     private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<Object, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
@@ -581,7 +600,12 @@ public abstract class YamlFileInterface {
             else if (value instanceof List) {
                 yaml.append("\n");
                 for (Object item : (List<?>) value) {
-                    splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+                    if (item instanceof Map) {
+                        // Handle maps in lists specially
+                        writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
+                    } else {
+                        splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+                    }
                 }
             }
             else if (value instanceof Set) {
@@ -596,7 +620,12 @@ public abstract class YamlFileInterface {
                     items = new ArrayList<>(set);
                 }
                 for (Object item : items) {
-                    splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+                    if (item instanceof Map) {
+                        // Handle maps in sets specially
+                        writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
+                    } else {
+                        splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+                    }
                 }
             }
             else {
