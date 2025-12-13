@@ -14,9 +14,6 @@ import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.Supplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Abstract class providing utility methods to handle YAML files, including
@@ -26,6 +23,7 @@ import java.util.stream.Collectors;
 public abstract class YamlFileInterface {
     static final Object UNKNOWN = new Object();
     private static final YamlWrapper yaml = YamlWrapperFactory.create();
+    private static final YamlWriter yamlWriter = new YamlWriter(yaml);
     private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
     private static final Map<Class<?>, Supplier<Collection<Object>>> COLLECTION_FACTORIES;
@@ -524,7 +522,7 @@ public abstract class YamlFileInterface {
         Class<?> clazz = this.getClass();
         YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
         if (yamlFileAnnotation!=null && !yamlFileAnnotation.header().trim().isEmpty()) {
-            splitAndAppend(result, yamlFileAnnotation.header(), "", "# ");
+            appendHeaderComment(result, yamlFileAnnotation.header());
             result.append("\n");
         }
 
@@ -550,176 +548,16 @@ public abstract class YamlFileInterface {
             }
         }
 
-        // 3. Convert the nested map to YAML
-        convertNestedMapToYaml(result, nestedMap.getMap(), 0);
+        // 3. Convert the nested map to YAML using YamlWriter
+        result.append(yamlWriter.write(nestedMap.getMap()));
 
         return result.toString();
     }
 
-    private void splitAndAppend(final @NotNull StringBuilder yaml, final @Nullable String data, final @NotNull String indentStr, final @NotNull String extra) {
-        if (data==null) {
-            return;
+    private void appendHeaderComment(StringBuilder result, String header) {
+        for (String line : header.split("\\r?\\n")) {
+            result.append("# ").append(line.replaceAll("\\s*$", "")).append("\n");
         }
-
-        for (String line : data.split("\\r?\\n")) {
-            yaml.append(indentStr).append(extra).append(line.replace("\\s*$", "")).append("\n");
-        }
-    }
-
-    /**
-     * Write a map as an item in a list/set with proper YAML formatting
-     */
-    private void writeMapItemInList(final StringBuilder yaml, final Map<?, ?> map, final String indentStr) {
-        boolean first = true;
-        for (Map.Entry<?, ?> mapEntry : map.entrySet()) {
-            if (first) {
-                // First key gets the "- " prefix
-                yaml.append(indentStr).append("- ").append(mapEntry.getKey()).append(": ")
-                    .append(formatValue(mapEntry.getValue())).append('\n');
-                first = false;
-            } else {
-                // Subsequent keys are indented at the same level as the first key's value
-                yaml.append(indentStr).append("  ").append(mapEntry.getKey()).append(": ")
-                    .append(formatValue(mapEntry.getValue())).append('\n');
-            }
-        }
-    }
-
-    /**
-     * Write a collection (List, Set, etc.) as an item in a list/set with proper YAML formatting
-     */
-    private void writeCollectionItemInList(final StringBuilder yaml, final Collection<?> collection, final String indentStr) {
-        // Convert collection to list, sorting Sets if elements are comparable
-        List<?> items;
-        if (collection instanceof Set) {
-            Set<?> set = (Set<?>) collection;
-            // Only sort if elements are Comparable
-            if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
-                items = set.stream().sorted().collect(Collectors.toList());
-            } else {
-                items = new ArrayList<>(set);
-            }
-        } else {
-            // For List, Queue, or other Collection types, preserve order
-            items = new ArrayList<>(collection);
-        }
-
-        boolean first = true;
-        for (Object item : items) {
-            if (first) {
-                // First item gets double "- " prefix (one for outer collection, one for inner collection)
-                splitAndAppend(yaml, formatValue(item), indentStr, "- - ");
-                first = false;
-            } else {
-                // Subsequent items are indented 2 more spaces with "- "
-                splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
-            }
-        }
-    }
-
-    private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<Object, Object> map, final int indent) {
-        StringBuilder tmp = new StringBuilder();
-        for (int i = 0; i < indent; i++) {
-            tmp.append("  ");
-        }
-        final String indentStr = tmp.toString();
-
-        for (Map.Entry<Object, Object> entry : map.entrySet()) {
-            Object key = entry.getKey();
-            Object value = entry.getValue();
-
-            if (value instanceof NestedMap.NestedNode) {
-                NestedMap.NestedNode node = (NestedMap.NestedNode) value;
-                value = node.value;
-
-                splitAndAppend(yaml, node.comment, indentStr, "# ");
-            }
-
-            yaml.append(indentStr).append(key).append(":");
-            if (value instanceof Map) {
-                yaml.append("\n");
-                convertNestedMapToYaml(yaml, (Map<Object, Object>) value, indent + 1);
-            }
-            else if (value instanceof Collection) {
-                yaml.append("\n");
-
-                // Convert collection to list, sorting Sets if elements are comparable
-                Collection<?> collection = (Collection<?>) value;
-                List<?> items;
-                if (value instanceof Set) {
-                    Set<?> set = (Set<?>) value;
-                    // Only sort if elements are Comparable (e.g., String, Integer)
-                    // Don't try to sort Maps or other non-comparable objects
-                    if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
-                        items = set.stream().sorted().collect(Collectors.toList());
-                    } else {
-                        items = new ArrayList<>(set);
-                    }
-                } else {
-                    // For List, Queue, or other Collection types, preserve order
-                    items = new ArrayList<>(collection);
-                }
-
-                // Write each item with appropriate handler based on type
-                for (Object item : items) {
-                    if (item instanceof Map) {
-                        writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
-                    } else if (item instanceof Collection) {
-                        writeCollectionItemInList(yaml, (Collection<?>) item, indentStr + "  ");
-                    } else {
-                        splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
-                    }
-                }
-            }
-            else {
-                yaml.append(' ').append(formatValue(value)).append('\n');
-            }
-        }
-    }
-
-    public static Optional<String> getStaticFieldName(Object value) {
-        try {
-            Class<?> clazz = value.getClass();
-
-            return Arrays.stream(clazz.getDeclaredFields())
-                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                         .filter(field -> {
-                             try {
-                                 field.setAccessible(true);
-                                 return field.get(null)==value;
-                             } catch (IllegalAccessException e) {
-                                 return false;
-                             }
-                         })
-                         .map(Field::getName)
-                         .findFirst();
-
-        } catch (Exception e) {
-            return Optional.empty();
-        }
-    }
-
-    Pattern genericToStringPattern = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
-
-    private @NotNull String formatValue(final Object value) {
-        String yamlContent = yaml.dump(value).trim();
-
-        if (value instanceof Enum || value instanceof UUID) {
-            // Remove the tag in the yaml
-            // !!org.avarion.yaml.Material 'A' --> 'A'
-            return yamlContent.replaceAll("^!!\\S+\\s+", "");
-        }
-        else {
-            Matcher matcher = genericToStringPattern.matcher(yamlContent);
-            if (matcher.matches()) {
-                Optional<String> originalName = getStaticFieldName(value);
-                if (originalName.isPresent()) {
-                    return originalName.get();
-                }
-            }
-        }
-
-        return yamlContent;
     }
 
     /**
