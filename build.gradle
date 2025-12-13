@@ -156,6 +156,12 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     testImplementation 'org.assertj:assertj-core:3.27.6'
+
+    // lombok
+    commonCompileOnly 'org.projectlombok:lombok:1.18.42'
+    commonAnnotationProcessor 'org.projectlombok:lombok:1.18.42'
+//    commonTestCompileOnly 'org.projectlombok:lombok:1.18.42'
+//    commonTestAnnotationProcessor 'org.projectlombok:lombok:1.18.42'
 }
 
 jar {

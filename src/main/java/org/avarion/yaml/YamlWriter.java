@@ -1,5 +1,7 @@
 package org.avarion.yaml;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,22 +16,19 @@ import java.util.stream.Collectors;
  * Responsible for converting nested Java objects to YAML format.
  * Handles primitive building blocks: Maps, Collections, and scalar values.
  */
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class YamlWriter {
     private static final Pattern GENERIC_TOSTRING_PATTERN =
         Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
 
     private final YamlWrapper yamlWrapper;
 
-    YamlWriter(YamlWrapper yamlWrapper) {
-        this.yamlWrapper = yamlWrapper;
-    }
-
     /**
      * Main entry point: converts a nested map to YAML string
      */
     public String write(Map<Object, Object> nestedMap) {
         StringBuilder result = new StringBuilder();
-        writeMap(result, nestedMap, 0, false);
+        writeValue(result, nestedMap, 0, false);
         return result.toString();
     }
 
@@ -130,19 +129,13 @@ class YamlWriter {
      * Primitive building block: Normalize a collection to a sorted list
      * Converts Sets to Lists, sorting if elements are Comparable
      */
-    private List<?> normalizeCollection(Collection<?> collection) {
-        if (collection instanceof Set) {
-            Set<?> set = (Set<?>) collection;
-            // Only sort if elements are Comparable (e.g., String, Integer)
-            if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
-                return set.stream().sorted().collect(Collectors.toList());
-            } else {
-                return new ArrayList<>(set);
-            }
-        } else {
-            // For List, Queue, or other Collection types, preserve order
-            return new ArrayList<>(collection);
+    private List<?> normalizeCollection(@NotNull Collection<?> collection) {
+        if (!collection.isEmpty() && collection instanceof Set && collection.iterator().next() instanceof Comparable) {
+            // Only re-order sets if their elements can be compared
+            return collection.stream().sorted().collect(Collectors.toList());
         }
+
+        return new ArrayList<>(collection);
     }
 
     /**
