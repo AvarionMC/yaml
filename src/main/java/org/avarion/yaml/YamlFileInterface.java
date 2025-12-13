@@ -136,37 +136,6 @@ public abstract class YamlFileInterface {
     }
 
     /**
-     * Extract generic type arguments from a field's parameterized type
-     */
-    @Contract("null -> new")
-    private static Type @NotNull [] extractGenericTypeArguments(final @Nullable Field field) {
-        if (field!=null) {
-            Type genericType = field.getGenericType();
-            if (genericType instanceof ParameterizedType) {
-                return ((ParameterizedType) genericType).getActualTypeArguments();
-            }
-        }
-        return new Type[0];
-    }
-
-    /**
-     * Convert the incoming value into a Set/List
-     */
-    private static @NotNull Object handleCollectionValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection, boolean isLenient) throws IOException {
-
-        if (field != null && field.getGenericType() instanceof ParameterizedType) {
-            return handleCollectionValueWithType(field.getGenericType(), collection, isLenient);
-        }
-
-        Collection<Object> result = createCollectionInstance(expectedType);
-        for (Object item : collection) {
-            result.add(item);
-        }
-        return result;
-    }
-
-    /**
      * Extract the raw Class from a Type, handling both Class and ParameterizedType
      */
     private static Class<?> getRawClass(Type type) {
@@ -182,87 +151,24 @@ public abstract class YamlFileInterface {
     }
 
     /**
-     * Convert value with Type information (for nested parameterized types)
+     * Convert the incoming value into a Set/List
      */
-    private static @Nullable Object getConvertedValueWithType(
-            final @NotNull Type type, final Object value, boolean isLenient) throws IOException {
+    private static @NotNull Object handleCollectionValue(
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection, boolean isLenient) throws IOException {
 
-        Class<?> expectedType = getRawClass(type);
-
-        if (value == null) {
-            return handleNullValue(expectedType, null);
-        }
-
-        if (value instanceof Map && Map.class.isAssignableFrom(expectedType)) {
-            return handleMapValueWithType(type, (Map<?, ?>) value, isLenient);
-        }
-
-        if (value instanceof List && Collection.class.isAssignableFrom(expectedType)) {
-            return handleCollectionValueWithType(type, (Collection<?>) value, isLenient);
-        }
-
-        // For non-parameterized types, use the regular conversion
-        return getConvertedValue(null, expectedType, value, isLenient);
-    }
-
-    /**
-     * Handle Map with explicit Type information
-     */
-    private static @NotNull Object handleMapValueWithType(
-            final @NotNull Type type, final Map<?, ?> map, boolean isLenient) throws IOException {
-
-        Map<Object, Object> result = new LinkedHashMap<>();
-
-        Type[] typeArgs = type instanceof ParameterizedType
-            ? ((ParameterizedType) type).getActualTypeArguments()
-            : new Type[0];
-
-        Type keyTypeArg = typeArgs.length > 0 ? typeArgs[0] : Object.class;
-        Type valueTypeArg = typeArgs.length > 1 ? typeArgs[1] : Object.class;
-
-        Class<?> keyType = getRawClass(keyTypeArg);
-        Class<?> valueType = getRawClass(valueTypeArg);
-
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            Object convertedKey = getConvertedValue(null, keyType, entry.getKey(), isLenient);
-
-            // If value type is parameterized, recursively handle it with type info
-            Object convertedValue;
-            if (valueTypeArg instanceof ParameterizedType) {
-                convertedValue = getConvertedValueWithType(valueTypeArg, entry.getValue(), isLenient);
-            } else {
-                convertedValue = getConvertedValue(null, valueType, entry.getValue(), isLenient);
-            }
-
-            result.put(convertedKey, convertedValue);
-        }
-        return result;
-    }
-
-    /**
-     * Handle Collection with explicit Type information
-     */
-    private static @NotNull Object handleCollectionValueWithType(
-            final @NotNull Type type, final Collection<?> collection, boolean isLenient) throws IOException {
-
-        Class<?> expectedType = getRawClass(type);
         Collection<Object> result = createCollectionInstance(expectedType);
 
-        Type[] typeArgs = type instanceof ParameterizedType
-            ? ((ParameterizedType) type).getActualTypeArguments()
-            : new Type[0];
-
-        Type elementTypeArg = typeArgs.length > 0 ? typeArgs[0] : Object.class;
-        Class<?> elementType = getRawClass(elementTypeArg);
+        // Extract element type from Field's generic type if available
+        Type elementType = Object.class;
+        if (field != null && field.getGenericType() instanceof ParameterizedType) {
+            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
+            if (typeArgs.length > 0) {
+                elementType = typeArgs[0];
+            }
+        }
 
         for (Object item : collection) {
-            // If element type is parameterized, recursively handle it with type info
-            Object convertedValue;
-            if (elementTypeArg instanceof ParameterizedType) {
-                convertedValue = getConvertedValueWithType(elementTypeArg, item, isLenient);
-            } else {
-                convertedValue = getConvertedValue(null, elementType, item, isLenient);
-            }
+            Object convertedValue = convertWithType(elementType, item, isLenient);
             result.add(convertedValue);
         }
         return result;
@@ -274,15 +180,76 @@ public abstract class YamlFileInterface {
     private static @NotNull Object handleMapValue(
             final @Nullable Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
 
+        Map<Object, Object> result = new LinkedHashMap<>();
+
+        // Extract key/value types from Field's generic type if available
+        Type keyType = Object.class;
+        Type valueType = Object.class;
         if (field != null && field.getGenericType() instanceof ParameterizedType) {
-            return handleMapValueWithType(field.getGenericType(), map, isLenient);
+            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
+            if (typeArgs.length > 0) keyType = typeArgs[0];
+            if (typeArgs.length > 1) valueType = typeArgs[1];
         }
 
-        Map<Object, Object> result = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : map.entrySet()) {
-            result.put(entry.getKey(), entry.getValue());
+            Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
+            Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
+            result.put(convertedKey, convertedValue);
         }
         return result;
+    }
+
+    /**
+     * Convert a value using Type information (handles both Class and ParameterizedType)
+     */
+    private static @Nullable Object convertWithType(final @NotNull Type type, final Object value, boolean isLenient) throws IOException {
+        Class<?> rawClass = getRawClass(type);
+
+        if (value == null) {
+            return handleNullValue(rawClass, null);
+        }
+
+        // Handle Maps with type information
+        if (value instanceof Map && Map.class.isAssignableFrom(rawClass)) {
+            Map<Object, Object> result = new LinkedHashMap<>();
+
+            // Extract type arguments if this is a ParameterizedType
+            Type keyType = Object.class;
+            Type valueType = Object.class;
+            if (type instanceof ParameterizedType) {
+                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
+                if (typeArgs.length > 0) keyType = typeArgs[0];
+                if (typeArgs.length > 1) valueType = typeArgs[1];
+            }
+
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
+                Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
+                result.put(convertedKey, convertedValue);
+            }
+            return result;
+        }
+
+        // Handle Collections with type information
+        if (value instanceof Collection && Collection.class.isAssignableFrom(rawClass)) {
+            Collection<Object> result = createCollectionInstance(rawClass);
+
+            // Extract element type if this is a ParameterizedType
+            Type elementType = Object.class;
+            if (type instanceof ParameterizedType) {
+                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
+                if (typeArgs.length > 0) elementType = typeArgs[0];
+            }
+
+            for (Object item : (Collection<?>) value) {
+                Object convertedItem = convertWithType(elementType, item, isLenient);
+                result.add(convertedItem);
+            }
+            return result;
+        }
+
+        // For non-parameterized types, use regular conversion
+        return getConvertedValue(null, rawClass, value, isLenient);
     }
 
     private static Collection<Object> createCollectionInstance(@NotNull Class<?> expectedType) throws IOException {
