@@ -586,38 +586,28 @@ public abstract class YamlFileInterface {
     }
 
     /**
-     * Write a list as an item in a list/set with proper YAML formatting
+     * Write a collection (List, Set, etc.) as an item in a list/set with proper YAML formatting
      */
-    private void writeListItemInList(final StringBuilder yaml, final List<?> list, final String indentStr) {
-        boolean first = true;
-        for (Object item : list) {
-            if (first) {
-                // First item gets double "- " prefix (one for outer list, one for inner list)
-                splitAndAppend(yaml, formatValue(item), indentStr, "- - ");
-                first = false;
-            } else {
-                // Subsequent items are indented 2 more spaces with "- "
-                splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
-            }
-        }
-    }
-
-    /**
-     * Write a set as an item in a list/set with proper YAML formatting
-     */
-    private void writeSetItemInList(final StringBuilder yaml, final Set<?> set, final String indentStr) {
-        // Sort if elements are comparable
+    private void writeCollectionItemInList(final StringBuilder yaml, final Collection<?> collection, final String indentStr) {
+        // Convert collection to list, sorting Sets if elements are comparable
         List<?> items;
-        if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
-            items = set.stream().sorted().collect(Collectors.toList());
+        if (collection instanceof Set) {
+            Set<?> set = (Set<?>) collection;
+            // Only sort if elements are Comparable
+            if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
+                items = set.stream().sorted().collect(Collectors.toList());
+            } else {
+                items = new ArrayList<>(set);
+            }
         } else {
-            items = new ArrayList<>(set);
+            // For List, Queue, or other Collection types, preserve order
+            items = new ArrayList<>(collection);
         }
 
         boolean first = true;
         for (Object item : items) {
             if (first) {
-                // First item gets double "- " prefix (one for outer list, one for inner set)
+                // First item gets double "- " prefix (one for outer collection, one for inner collection)
                 splitAndAppend(yaml, formatValue(item), indentStr, "- - ");
                 first = false;
             } else {
@@ -650,44 +640,32 @@ public abstract class YamlFileInterface {
                 yaml.append("\n");
                 convertNestedMapToYaml(yaml, (Map<Object, Object>) value, indent + 1);
             }
-            else if (value instanceof List) {
+            else if (value instanceof Collection) {
                 yaml.append("\n");
-                for (Object item : (List<?>) value) {
-                    if (item instanceof Map) {
-                        // Handle maps in lists specially
-                        writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
-                    } else if (item instanceof List) {
-                        // Handle nested lists
-                        writeListItemInList(yaml, (List<?>) item, indentStr + "  ");
-                    } else if (item instanceof Set) {
-                        // Handle nested sets
-                        writeSetItemInList(yaml, (Set<?>) item, indentStr + "  ");
-                    } else {
-                        splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
-                    }
-                }
-            }
-            else if (value instanceof Set) {
-                yaml.append("\n");
-                Set<?> set = (Set<?>) value;
-                // Only sort if elements are Comparable (e.g., String, Integer)
-                // Don't try to sort Maps or other non-comparable objects
+
+                // Convert collection to list, sorting Sets if elements are comparable
+                Collection<?> collection = (Collection<?>) value;
                 List<?> items;
-                if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
-                    items = set.stream().sorted().collect(Collectors.toList());
+                if (value instanceof Set) {
+                    Set<?> set = (Set<?>) value;
+                    // Only sort if elements are Comparable (e.g., String, Integer)
+                    // Don't try to sort Maps or other non-comparable objects
+                    if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
+                        items = set.stream().sorted().collect(Collectors.toList());
+                    } else {
+                        items = new ArrayList<>(set);
+                    }
                 } else {
-                    items = new ArrayList<>(set);
+                    // For List, Queue, or other Collection types, preserve order
+                    items = new ArrayList<>(collection);
                 }
+
+                // Write each item with appropriate handler based on type
                 for (Object item : items) {
                     if (item instanceof Map) {
-                        // Handle maps in sets specially
                         writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
-                    } else if (item instanceof List) {
-                        // Handle nested lists
-                        writeListItemInList(yaml, (List<?>) item, indentStr + "  ");
-                    } else if (item instanceof Set) {
-                        // Handle nested sets
-                        writeSetItemInList(yaml, (Set<?>) item, indentStr + "  ");
+                    } else if (item instanceof Collection) {
+                        writeCollectionItemInList(yaml, (Collection<?>) item, indentStr + "  ");
                     } else {
                         splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
                     }

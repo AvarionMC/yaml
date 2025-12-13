@@ -355,4 +355,31 @@ class NestedMapTests extends TestCommon {
         java.util.List<Integer> team1 = loaded.mapWithListValues.get("team1");
         assertEquals(999, team1.get(0));
     }
+
+    @Test
+    void testListOfSets() throws IOException {
+        // Test List<Set<String>> - this covers writeCollectionItemInList with Set items
+        NestedMapClass config = new NestedMapClass();
+        config.save(target);
+
+        // Load it back
+        NestedMapClass loaded = new NestedMapClass().load(target);
+
+        // Verify the list of sets
+        assertNotNull(loaded.listOfSets);
+        assertEquals(2, loaded.listOfSets.size());
+
+        Set<String> set1 = loaded.listOfSets.get(0);
+        assertNotNull(set1);
+        assertEquals(2, set1.size());
+        assertTrue(set1.contains("alpha"));
+        assertTrue(set1.contains("beta"));
+
+        Set<String> set2 = loaded.listOfSets.get(1);
+        assertNotNull(set2);
+        assertEquals(3, set2.size());
+        assertTrue(set2.contains("gamma"));
+        assertTrue(set2.contains("delta"));
+        assertTrue(set2.contains("epsilon"));
+    }
 }

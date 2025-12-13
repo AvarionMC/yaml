@@ -42,6 +42,10 @@ public class NestedMapClass extends YamlFileInterface {
     @YamlKey("map-with-set-values")
     public Map<String, Set<String>> mapWithSetValues = new LinkedHashMap<>();
 
+    // Test for List containing Sets: List<Set<String>>
+    @YamlKey("list-of-sets")
+    public List<Set<String>> listOfSets = new ArrayList<>();
+
     public NestedMapClass() {
         // Initialize with some default values
         Map<String, Object> innerMap1 = new HashMap<>();
@@ -163,5 +167,18 @@ public class NestedMapClass extends YamlFileInterface {
 
         mapWithSetValues.put("group1", tags1);
         mapWithSetValues.put("group2", tags2);
+
+        // For list of sets
+        Set<String> set1 = new LinkedHashSet<>();
+        set1.add("alpha");
+        set1.add("beta");
+
+        Set<String> set2 = new LinkedHashSet<>();
+        set2.add("gamma");
+        set2.add("delta");
+        set2.add("epsilon");
+
+        listOfSets.add(set1);
+        listOfSets.add(set2);
     }
 }
