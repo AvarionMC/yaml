@@ -10,9 +10,6 @@ public class StaticFieldTestClass {
     // Private static field - should NOT be found (not public)
     private static final StaticFieldTestClass PRIVATE_INSTANCE = new StaticFieldTestClass("private");
 
-    // Non-static field - should NOT be found
-    public final StaticFieldTestClass NON_STATIC_INSTANCE = new StaticFieldTestClass("non-static");
-
     // Public static but different value - should NOT match
     public static final StaticFieldTestClass OTHER_INSTANCE = new StaticFieldTestClass("other");
 
