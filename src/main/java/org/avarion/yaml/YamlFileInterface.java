@@ -581,6 +581,48 @@ public abstract class YamlFileInterface {
         }
     }
 
+    /**
+     * Write a list as an item in a list/set with proper YAML formatting
+     */
+    private void writeListItemInList(final StringBuilder yaml, final List<?> list, final String indentStr) {
+        boolean first = true;
+        for (Object item : list) {
+            if (first) {
+                // First item gets the "- " prefix
+                splitAndAppend(yaml, formatValue(item), indentStr, "- ");
+                first = false;
+            } else {
+                // Subsequent items are at the same indentation with "- "
+                splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+            }
+        }
+    }
+
+    /**
+     * Write a set as an item in a list/set with proper YAML formatting
+     */
+    private void writeSetItemInList(final StringBuilder yaml, final Set<?> set, final String indentStr) {
+        // Sort if elements are comparable
+        List<?> items;
+        if (!set.isEmpty() && set.iterator().next() instanceof Comparable) {
+            items = set.stream().sorted().collect(Collectors.toList());
+        } else {
+            items = new ArrayList<>(set);
+        }
+
+        boolean first = true;
+        for (Object item : items) {
+            if (first) {
+                // First item gets the "- " prefix
+                splitAndAppend(yaml, formatValue(item), indentStr, "- ");
+                first = false;
+            } else {
+                // Subsequent items are at the same indentation with "- "
+                splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
+            }
+        }
+    }
+
     private void convertNestedMapToYaml(final StringBuilder yaml, final @NotNull Map<Object, Object> map, final int indent) {
         StringBuilder tmp = new StringBuilder();
         for (int i = 0; i < indent; i++) {
@@ -610,6 +652,12 @@ public abstract class YamlFileInterface {
                     if (item instanceof Map) {
                         // Handle maps in lists specially
                         writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
+                    } else if (item instanceof List) {
+                        // Handle nested lists
+                        writeListItemInList(yaml, (List<?>) item, indentStr + "  ");
+                    } else if (item instanceof Set) {
+                        // Handle nested sets
+                        writeSetItemInList(yaml, (Set<?>) item, indentStr + "  ");
                     } else {
                         splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
                     }
@@ -630,6 +678,12 @@ public abstract class YamlFileInterface {
                     if (item instanceof Map) {
                         // Handle maps in sets specially
                         writeMapItemInList(yaml, (Map<?, ?>) item, indentStr + "  ");
+                    } else if (item instanceof List) {
+                        // Handle nested lists
+                        writeListItemInList(yaml, (List<?>) item, indentStr + "  ");
+                    } else if (item instanceof Set) {
+                        // Handle nested sets
+                        writeSetItemInList(yaml, (Set<?>) item, indentStr + "  ");
                     } else {
                         splitAndAppend(yaml, formatValue(item), indentStr + "  ", "- ");
                     }
