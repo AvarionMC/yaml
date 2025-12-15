@@ -5,7 +5,9 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -25,7 +27,7 @@ class YamlWriter {
     /**
      * Main entry point: converts a nested map to YAML string
      */
-    public String write(Map<Object, Object> nestedMap) {
+    public String write(Map<Object, Object> nestedMap) throws IOException {
         StringBuilder result = new StringBuilder();
         writeValue(result, nestedMap, "", "");
         return result.toString();
@@ -35,7 +37,7 @@ class YamlWriter {
      * SINGLE DISPATCHER: Decides what type to write (Map, Collection, or scalar)
      * This is the ONLY place where we check the type of a value.
      */
-    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) {
+    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) throws IOException {
         if (value instanceof Map) {
             writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
         }
@@ -50,7 +52,7 @@ class YamlWriter {
     /**
      * Primitive building block: Write a Map
      */
-    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String firstIndent, String indent) {
+    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String firstIndent, String indent) throws IOException {
         boolean firstEntry = true;
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
@@ -73,7 +75,7 @@ class YamlWriter {
     /**
      * Primitive building block: Write a Collection
      */
-    private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) {
+    private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) throws IOException {
         List<?> items = normalizeCollection(collection);
         for (Object item : items) {
             if (!yaml.subSequence(yaml.length() - 2, yaml.length()).equals("- ")) {
@@ -87,7 +89,7 @@ class YamlWriter {
     /**
      * Primitive building block: Write a scalar value (just the formatted value, no newline)
      */
-    private void writeScalar(@NotNull StringBuilder yaml, @Nullable Object value) {
+    private void writeScalar(@NotNull StringBuilder yaml, @Nullable Object value) throws IOException {
         if (yaml.charAt(yaml.length() - 1)=='\n') {
             yaml.deleteCharAt(yaml.length() - 1);
         }
@@ -114,21 +116,51 @@ class YamlWriter {
     /**
      * Primitive building block: Format a scalar value for YAML output
      */
-    private String formatValue(@Nullable Object value) {
+    private String formatValue(@Nullable Object value) throws IOException {
+        if (value==null) {
+            return "null";
+        }
+
+        // Check if it's a Bukkit Keyed object (via reflection to avoid hard dependency)
+        // Check if value implements Keyed interface
+        Class<?> keyedInterface = null;
+        try {
+            keyedInterface = Class.forName("org.bukkit.Keyed");
+        } catch (ClassNotFoundException e) {
+            throw new IOException(e);
+        }
+
+        if (keyedInterface.isInstance(value)) {
+            try {
+                // Call key() to get NamespacedKey
+                Method getKeyMethod = value.getClass().getMethod("key");
+                Object namespacedKey = getKeyMethod.invoke(value);
+
+                // Call value() on NamespacedKey to get the string key
+                Method getKeyStringMethod = namespacedKey.getClass().getMethod("value");
+                String key = (String) getKeyStringMethod.invoke(namespacedKey);
+
+                // Replace dots with underscores
+                return key.toUpperCase(Locale.ENGLISH).replace('.', '_');
+            } catch (NoSuchMethodException | IllegalAccessException | java.lang.reflect.InvocationTargetException e) {
+                // Keyed interface not available or reflection failed, continue with normal handling
+                throw new IOException("Failed to get key from Keyed object", e);
+            }
+        }
+
         String yamlContent = yamlWrapper.dump(value).trim();
 
         if (value instanceof Enum || value instanceof UUID) {
             // Remove the type tag: !!org.avarion.yaml.Material 'A' --> 'A'
             return yamlContent.replaceAll("^!!\\S+\\s+", "");
         }
-        else {
-            // Check for generic toString() pattern and try to find static field name
-            Matcher matcher = GENERIC_TOSTRING_PATTERN.matcher(yamlContent);
-            if (matcher.matches()) {
-                Optional<String> originalName = getStaticFieldName(value);
-                if (originalName.isPresent()) {
-                    return originalName.get();
-                }
+
+        // Check for generic toString() pattern and try to find static field name
+        Matcher matcher = GENERIC_TOSTRING_PATTERN.matcher(yamlContent);
+        if (matcher.matches()) {
+            Optional<String> originalName = getStaticFieldName(value);
+            if (originalName.isPresent()) {
+                return originalName.get();
             }
         }
 

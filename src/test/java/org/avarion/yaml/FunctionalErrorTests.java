@@ -1,5 +1,7 @@
 package org.avarion.yaml;
 
+import org.avarion.yaml.testClasses.SoundTestClass;
+import org.bukkit.Sound;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -39,5 +41,18 @@ public class FunctionalErrorTests extends TestCommon {
 
         assertInstanceOf(List.class, el.get("output"));
         assertEquals(List.of("a", "b"), el.get("output"));
+    }
+
+    @Test
+    void testInterfaceElement() throws IOException {
+        new SoundTestClass().save(target);
+
+        SoundTestClass loaded = new SoundTestClass().load(target);
+        assertEquals(Sound.A, loaded.name);
+        assertFalse(readFile().contains("A-test"));
+
+        replaceInTarget("name: A", "name: B");
+        SoundTestClass loaded2 = new SoundTestClass().load(target);
+        assertEquals(Sound.B, loaded2.name);
     }
 }

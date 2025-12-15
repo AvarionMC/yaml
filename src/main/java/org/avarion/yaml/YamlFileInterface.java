@@ -520,7 +520,7 @@ public abstract class YamlFileInterface {
         return getNestedValue((Map<String, Object>) tmp, keys);
     }
 
-    private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey {
+    private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey, IOException {
 
         StringBuilder result = new StringBuilder();
 
