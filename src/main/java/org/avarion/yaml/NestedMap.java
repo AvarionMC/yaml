@@ -12,11 +12,6 @@ class NestedMap {
 
 	@SuppressWarnings("unchecked")
 	public void put(@NotNull String key, @Nullable String comment, Object value) throws DuplicateKey {
-		put(key, comment, value, null);
-	}
-
-	@SuppressWarnings("unchecked")
-	public void put(@NotNull String key, @Nullable String comment, Object value, @Nullable Class<?> declaredType) throws DuplicateKey {
 		String[] keys = key.split("\\.");
 
 		Map<Object, Object> current = map;
@@ -29,7 +24,7 @@ class NestedMap {
 			throw new DuplicateKey(key);
 		}
 
-		current.put(lastKey, new NestedNode(value, comment, declaredType));
+		current.put(lastKey, new NestedNode(value, comment));
 	}
 
 	public Map<Object, Object> getMap() {
@@ -39,16 +34,10 @@ class NestedMap {
 	public static class NestedNode {
 		public final Object value;
 		public final @Nullable String comment;
-		public final @Nullable Class<?> declaredType;
 
 		public NestedNode(@Nullable Object value, @Nullable String comment) {
-			this(value, comment, null);
-		}
-
-		public NestedNode(@Nullable Object value, @Nullable String comment, @Nullable Class<?> declaredType) {
 			this.value = value;
 			this.comment = comment;
-			this.declaredType = declaredType;
 		}
 	}
 }

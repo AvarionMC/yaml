@@ -1,7 +1,7 @@
 package org.avarion.yaml;
 
-import org.avarion.yaml.testClasses.StaticInterfaceElements;
-import org.avarion.yaml.testClasses.StaticInterfaceTestClass;
+import org.avarion.yaml.testClasses.SoundTestClass;
+import org.bukkit.Sound;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -45,13 +45,14 @@ public class FunctionalErrorTests extends TestCommon {
 
     @Test
     void testInterfaceElement() throws IOException {
-        new StaticInterfaceTestClass().save(target);
+        new SoundTestClass().save(target);
 
-        StaticInterfaceTestClass loaded = new StaticInterfaceTestClass().load(target);
-        assertEquals(StaticInterfaceElements.A, loaded.name);
+        SoundTestClass loaded = new SoundTestClass().load(target);
+        assertEquals(Sound.A, loaded.name);
+        assertFalse(readFile().contains("A-test"));
 
         replaceInTarget("name: A", "name: B");
-        StaticInterfaceTestClass loaded2 = new StaticInterfaceTestClass().load(target);
-        assertEquals(StaticInterfaceElements.B, loaded2.name);
+        SoundTestClass loaded2 = new SoundTestClass().load(target);
+        assertEquals(Sound.B, loaded2.name);
     }
 }

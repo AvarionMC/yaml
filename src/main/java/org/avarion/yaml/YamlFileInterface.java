@@ -520,7 +520,7 @@ public abstract class YamlFileInterface {
         return getNestedValue((Map<String, Object>) tmp, keys);
     }
 
-    private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey {
+    private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey, IOException {
 
         StringBuilder result = new StringBuilder();
 
@@ -547,7 +547,7 @@ public abstract class YamlFileInterface {
                 Object value = field.get(this);
                 YamlComment comment = field.getAnnotation(YamlComment.class);
 
-                nestedMap.put(keyAnnotation.value(), comment==null ? null:comment.value(), value, field.getType());
+                nestedMap.put(keyAnnotation.value(), comment==null ? null:comment.value(), value);
             }
             else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
                 writeYamlMapField(nestedMap, this, field, mapAnnotation);

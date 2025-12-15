@@ -5,8 +5,13 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -15,12 +20,14 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class YamlWriter {
+    private static final Pattern GENERIC_TOSTRING_PATTERN = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
+
     private final YamlWrapper yamlWrapper;
 
     /**
      * Main entry point: converts a nested map to YAML string
      */
-    public String write(Map<Object, Object> nestedMap) {
+    public String write(Map<Object, Object> nestedMap) throws IOException {
         StringBuilder result = new StringBuilder();
         writeValue(result, nestedMap, "", "");
         return result.toString();
@@ -30,11 +37,7 @@ class YamlWriter {
      * SINGLE DISPATCHER: Decides what type to write (Map, Collection, or scalar)
      * This is the ONLY place where we check the type of a value.
      */
-    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) {
-        writeValue(yaml, value, firstIndent, indent, null);
-    }
-
-    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent, Class<?> declaredType) {
+    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) throws IOException {
         if (value instanceof Map) {
             writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
         }
@@ -42,39 +45,37 @@ class YamlWriter {
             writeCollection(yaml, (Collection<?>) value, indent);
         }
         else {
-            writeScalar(yaml, value, declaredType);
+            writeScalar(yaml, value);
         }
     }
 
     /**
      * Primitive building block: Write a Map
      */
-    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String firstIndent, String indent) {
+    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String firstIndent, String indent) throws IOException {
         boolean firstEntry = true;
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
             Object value = entry.getValue();
-            Class<?> declaredType = null;
 
             // Handle comments from NestedNode
             if (value instanceof NestedMap.NestedNode) {
                 NestedMap.NestedNode node = (NestedMap.NestedNode) value;
                 appendComment(yaml, node.comment, indent);
                 value = node.value;
-                declaredType = node.declaredType;
             }
             yaml.append(firstEntry ? firstIndent:indent);
             firstEntry = false;
 
             yaml.append(key).append(":\n");
-            writeValue(yaml, value, indent + "  ", indent + "  ", declaredType);
+            writeValue(yaml, value, indent + "  ", indent + "  ");
         }
     }
 
     /**
      * Primitive building block: Write a Collection
      */
-    private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) {
+    private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) throws IOException {
         List<?> items = normalizeCollection(collection);
         for (Object item : items) {
             if (!yaml.subSequence(yaml.length() - 2, yaml.length()).equals("- ")) {
@@ -88,14 +89,14 @@ class YamlWriter {
     /**
      * Primitive building block: Write a scalar value (just the formatted value, no newline)
      */
-    private void writeScalar(@NotNull StringBuilder yaml, @Nullable Object value, @Nullable Class<?> declaredType) {
+    private void writeScalar(@NotNull StringBuilder yaml, @Nullable Object value) throws IOException {
         if (yaml.charAt(yaml.length() - 1)=='\n') {
             yaml.deleteCharAt(yaml.length() - 1);
         }
         if (yaml.charAt(yaml.length() - 1)!=' ') {
             yaml.append(' ');
         }
-        yaml.append(formatValue(value, declaredType));
+        yaml.append(formatValue(value));
         yaml.append('\n');
     }
 
@@ -115,30 +116,36 @@ class YamlWriter {
     /**
      * Primitive building block: Format a scalar value for YAML output
      */
-    private String formatValue(@Nullable Object value, @Nullable Class<?> declaredType) {
-        if (value == null) {
-            return yamlWrapper.dump(null).trim();
+    private String formatValue(@Nullable Object value) throws IOException {
+        if (value==null) {
+            return "null";
         }
 
         // Check if it's a Bukkit Keyed object (via reflection to avoid hard dependency)
+        // Check if value implements Keyed interface
+        Class<?> keyedInterface = null;
         try {
-            // Check if value implements Keyed interface
-            Class<?> keyedInterface = Class.forName("org.bukkit.Keyed");
-            if (keyedInterface.isInstance(value)) {
-                // Call getKey() to get NamespacedKey
-                Method getKeyMethod = value.getClass().getMethod("getKey");
+            keyedInterface = Class.forName("org.bukkit.Keyed");
+        } catch (ClassNotFoundException e) {
+            throw new IOException(e);
+        }
+
+        if (keyedInterface.isInstance(value)) {
+            try {
+                // Call key() to get NamespacedKey
+                Method getKeyMethod = value.getClass().getMethod("key");
                 Object namespacedKey = getKeyMethod.invoke(value);
 
-                // Call getKey() on NamespacedKey to get the string key
-                Method getKeyStringMethod = namespacedKey.getClass().getMethod("getKey");
+                // Call value() on NamespacedKey to get the string key
+                Method getKeyStringMethod = namespacedKey.getClass().getMethod("value");
                 String key = (String) getKeyStringMethod.invoke(namespacedKey);
 
                 // Replace dots with underscores
-                return key.replace('.', '_');
+                return key.toUpperCase(Locale.ENGLISH).replace('.', '_');
+            } catch (NoSuchMethodException | IllegalAccessException | java.lang.reflect.InvocationTargetException e) {
+                // Keyed interface not available or reflection failed, continue with normal handling
+                throw new IOException("Failed to get key from Keyed object", e);
             }
-        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException |
-                 java.lang.reflect.InvocationTargetException e) {
-            // Keyed interface not available or reflection failed, continue with normal handling
         }
 
         String yamlContent = yamlWrapper.dump(value).trim();
@@ -148,7 +155,40 @@ class YamlWriter {
             return yamlContent.replaceAll("^!!\\S+\\s+", "");
         }
 
+        // Check for generic toString() pattern and try to find static field name
+        Matcher matcher = GENERIC_TOSTRING_PATTERN.matcher(yamlContent);
+        if (matcher.matches()) {
+            Optional<String> originalName = getStaticFieldName(value);
+            if (originalName.isPresent()) {
+                return originalName.get();
+            }
+        }
+
         return yamlContent;
+    }
+
+    /**
+     * Helper: Find the name of a public static field that holds this value
+     */
+    private static Optional<String> getStaticFieldName(@Nullable Object value) {
+        try {
+            Class<?> clazz = value.getClass();
+
+            return Arrays.stream(clazz.getDeclaredFields())
+                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
+                         .filter(field -> {
+                             try {
+                                 field.setAccessible(true);
+                                 return field.get(null)==value;
+                             } catch (IllegalAccessException e) {
+                                 return false;
+                             }
+                         })
+                         .map(Field::getName)
+                         .findFirst();
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     /**
