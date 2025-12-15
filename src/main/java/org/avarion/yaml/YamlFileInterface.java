@@ -71,6 +71,12 @@ public abstract class YamlFileInterface {
             return handleNullValue(expectedType, field);
         }
 
+        // If expected type is Object, return value as-is for collections and maps
+        // since we don't have type information to guide conversion
+        if (expectedType == Object.class && (value instanceof Collection || value instanceof Map)) {
+            return value;
+        }
+
         if (expectedType.isEnum() && value instanceof String) {
             return stringToEnum((Class<? extends Enum>) expectedType, (String) value);
         }

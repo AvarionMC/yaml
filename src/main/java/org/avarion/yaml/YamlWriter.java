@@ -87,7 +87,7 @@ class YamlWriter {
     /**
      * Primitive building block: Write a scalar value (just the formatted value, no newline)
      */
-    private void writeScalar(@NotNull StringBuilder yaml, Object value) {
+    private void writeScalar(@NotNull StringBuilder yaml, @Nullable Object value) {
         if (yaml.charAt(yaml.length() - 1)=='\n') {
             yaml.deleteCharAt(yaml.length() - 1);
         }
@@ -114,7 +114,7 @@ class YamlWriter {
     /**
      * Primitive building block: Format a scalar value for YAML output
      */
-    private String formatValue(Object value) {
+    private String formatValue(@Nullable Object value) {
         String yamlContent = yamlWrapper.dump(value).trim();
 
         if (value instanceof Enum || value instanceof UUID) {
@@ -138,7 +138,7 @@ class YamlWriter {
     /**
      * Helper: Find the name of a public static field that holds this value
      */
-    private static Optional<String> getStaticFieldName(Object value) {
+    private static Optional<String> getStaticFieldName(@Nullable Object value) {
         try {
             Class<?> clazz = value.getClass();
 

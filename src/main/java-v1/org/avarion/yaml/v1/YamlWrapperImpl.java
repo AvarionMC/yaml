@@ -1,6 +1,7 @@
 package org.avarion.yaml.v1;
 
 import org.avarion.yaml.YamlWrapper;
+import org.jetbrains.annotations.Nullable;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -15,7 +16,7 @@ public class YamlWrapperImpl implements YamlWrapper {
     }
 
     @Override
-    public String dump(Object data) {
+    public String dump(@Nullable Object data) {
         return yaml.dump(data);
     }
 
