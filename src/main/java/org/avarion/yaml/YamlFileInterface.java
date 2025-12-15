@@ -62,7 +62,14 @@ public abstract class YamlFileInterface {
         }
 
         found.setAccessible(true);
-        return found.get(null);
+        Object value = found.get(null);
+
+        // Register the static field so it can be serialized correctly
+        if (value != null && Modifier.isStatic(found.getModifiers())) {
+            YamlWriter.registerStaticField(value, found.getDeclaringClass(), found.getName());
+        }
+
+        return value;
     }
 
     private static @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value, boolean isLenient)
