@@ -622,6 +622,11 @@ public abstract class YamlFileInterface {
                 Object value = field.get(this);
                 YamlComment comment = field.getAnnotation(YamlComment.class);
 
+                // Register the static field source before serializing
+                if (value != null) {
+                    registerStaticFieldSource(value, field.getType());
+                }
+
                 nestedMap.put(keyAnnotation.value(), comment==null ? null:comment.value(), value, field.getType());
             }
             else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
