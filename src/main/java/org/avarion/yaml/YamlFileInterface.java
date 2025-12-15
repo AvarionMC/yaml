@@ -373,23 +373,6 @@ public abstract class YamlFileInterface {
             data = new HashMap<>();
         }
 
-        // First, register all current field values before they get overwritten by YAML
-        // This captures the initialized values like StaticInterfaceElements.A
-        for (Class<?> clazz = this.getClass(); clazz!=null; clazz = clazz.getSuperclass()) {
-            for (Field field : clazz.getDeclaredFields()) {
-                YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-                if (keyAnnotation != null && !keyAnnotation.value().trim().isEmpty()) {
-                    field.setAccessible(true);
-                    Object currentValue = field.get(this);
-                    if (currentValue != null) {
-                        // Try to find where this value comes from and register it
-                        registerStaticFieldSource(currentValue, field.getType());
-                    }
-                }
-            }
-        }
-
-        // Now load the YAML values
         for (Class<?> clazz = this.getClass(); clazz!=null; clazz = clazz.getSuperclass()) {
             for (Field field : clazz.getDeclaredFields()) {
                 YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
@@ -405,64 +388,6 @@ public abstract class YamlFileInterface {
                 else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
                     readYamlMapField(data, field, mapAnnotation);
                 }
-            }
-        }
-    }
-
-    /**
-     * Try to find if this value is a static field from somewhere and register it
-     */
-    private void registerStaticFieldSource(Object value, Class<?> fieldType) {
-        // Check if the value itself is from a static field in its own class
-        try {
-            for (Field staticField : value.getClass().getDeclaredFields()) {
-                if (Modifier.isStatic(staticField.getModifiers()) && Modifier.isPublic(staticField.getModifiers())) {
-                    staticField.setAccessible(true);
-                    if (staticField.get(null) == value) {
-                        YamlWriter.registerStaticField(value, value.getClass(), staticField.getName());
-                        return;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // Continue searching
-        }
-
-        // Check interfaces in the same package as the field type
-        searchPackageForStaticField(value, fieldType);
-    }
-
-    /**
-     * Search for static fields in classes/interfaces from the same package
-     */
-    private void searchPackageForStaticField(Object value, Class<?> fieldType) {
-        // Try common naming patterns for interfaces with static constants
-        String packageName = fieldType.getPackage().getName();
-        String typeName = fieldType.getSimpleName();
-
-        String[] candidateNames = {
-            packageName + ".Static" + typeName + "Elements",
-            packageName + "." + typeName + "Elements",
-            packageName + ".StaticInterfaceElements",
-            packageName + ".Static" + typeName + "s",
-        };
-
-        for (String candidateName : candidateNames) {
-            try {
-                Class<?> candidateClass = Class.forName(candidateName);
-                for (Field field : candidateClass.getDeclaredFields()) {
-                    if (Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers())) {
-                        field.setAccessible(true);
-                        if (field.get(null) == value) {
-                            YamlWriter.registerStaticField(value, candidateClass, field.getName());
-                            return;
-                        }
-                    }
-                }
-            } catch (ClassNotFoundException e) {
-                // Try next pattern
-            } catch (Exception e) {
-                // Ignore other errors
             }
         }
     }
@@ -621,11 +546,6 @@ public abstract class YamlFileInterface {
                 field.setAccessible(true);
                 Object value = field.get(this);
                 YamlComment comment = field.getAnnotation(YamlComment.class);
-
-                // Register the static field source before serializing
-                if (value != null) {
-                    registerStaticFieldSource(value, field.getType());
-                }
 
                 nestedMap.put(keyAnnotation.value(), comment==null ? null:comment.value(), value, field.getType());
             }

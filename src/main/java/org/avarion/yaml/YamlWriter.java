@@ -5,8 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -16,29 +15,7 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class YamlWriter {
-    // Track static field instances and their source (declaring class + field name)
-    private static final WeakHashMap<Object, FieldSource> STATIC_FIELD_REGISTRY = new WeakHashMap<>();
-
     private final YamlWrapper yamlWrapper;
-
-    static class FieldSource {
-        final Class<?> declaringClass;
-        final String fieldName;
-
-        FieldSource(Class<?> declaringClass, String fieldName) {
-            this.declaringClass = declaringClass;
-            this.fieldName = fieldName;
-        }
-    }
-
-    /**
-     * Register a static field value so it can be looked up during serialization
-     */
-    static void registerStaticField(Object value, Class<?> declaringClass, String fieldName) {
-        if (value != null) {
-            STATIC_FIELD_REGISTRY.put(value, new FieldSource(declaringClass, fieldName));
-        }
-    }
 
     /**
      * Main entry point: converts a nested map to YAML string
@@ -139,6 +116,31 @@ class YamlWriter {
      * Primitive building block: Format a scalar value for YAML output
      */
     private String formatValue(@Nullable Object value, @Nullable Class<?> declaredType) {
+        if (value == null) {
+            return yamlWrapper.dump(null).trim();
+        }
+
+        // Check if it's a Bukkit Keyed object (via reflection to avoid hard dependency)
+        try {
+            // Check if value implements Keyed interface
+            Class<?> keyedInterface = Class.forName("org.bukkit.Keyed");
+            if (keyedInterface.isInstance(value)) {
+                // Call getKey() to get NamespacedKey
+                Method getKeyMethod = value.getClass().getMethod("getKey");
+                Object namespacedKey = getKeyMethod.invoke(value);
+
+                // Call getKey() on NamespacedKey to get the string key
+                Method getKeyStringMethod = namespacedKey.getClass().getMethod("getKey");
+                String key = (String) getKeyStringMethod.invoke(namespacedKey);
+
+                // Replace dots with underscores
+                return key.replace('.', '_');
+            }
+        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException |
+                 java.lang.reflect.InvocationTargetException e) {
+            // Keyed interface not available or reflection failed, continue with normal handling
+        }
+
         String yamlContent = yamlWrapper.dump(value).trim();
 
         if (value instanceof Enum || value instanceof UUID) {
@@ -146,152 +148,7 @@ class YamlWriter {
             return yamlContent.replaceAll("^!!\\S+\\s+", "");
         }
 
-        // Check for static field name (class or interface)
-        Optional<String> originalName = getStaticFieldName(value, declaredType);
-        if (originalName.isPresent()) {
-            return originalName.get();
-        }
-
         return yamlContent;
-    }
-
-    /**
-     * Helper: Find the name of a public static field that holds this value
-     * Checks both class fields and interface constants
-     */
-    private static Optional<String> getStaticFieldName(@Nullable Object value, @Nullable Class<?> declaredType) {
-        if (value == null) return Optional.empty();
-
-        try {
-            // First check the registry for tracked static fields
-            FieldSource source = STATIC_FIELD_REGISTRY.get(value);
-            if (source != null) {
-                return Optional.of(source.fieldName);
-            }
-
-            Class<?> clazz = value.getClass();
-
-            // Check the class's own declared fields
-            Optional<String> classField = checkClassFields(clazz, value);
-            if (classField.isPresent()) {
-                return classField;
-            }
-
-            // Check interface fields (constants) of the runtime class
-            Optional<String> interfaceField = checkInterfaceFields(clazz, value);
-            if (interfaceField.isPresent()) {
-                return interfaceField;
-            }
-
-            // If we have a declared type, search for static fields
-            if (declaredType != null) {
-                return searchByDeclaredType(value, declaredType);
-            }
-
-            return Optional.empty();
-        } catch (Exception e) {
-            return Optional.empty();
-        }
-    }
-
-    private static Optional<String> checkClassFields(Class<?> clazz, Object value) {
-        return Arrays.stream(clazz.getDeclaredFields())
-                     .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                     .filter(field -> {
-                         try {
-                             field.setAccessible(true);
-                             return field.get(null) == value;
-                         } catch (IllegalAccessException e) {
-                             return false;
-                         }
-                     })
-                     .map(Field::getName)
-                     .findFirst();
-    }
-
-    /**
-     * Search for static fields by checking the declared type and registering any found
-     */
-    private static Optional<String> searchByDeclaredType(Object value, Class<?> declaredType) {
-        // Check the declared type itself for static fields
-        Optional<String> directField = checkAndRegisterClassFields(declaredType, value);
-        if (directField.isPresent()) {
-            return directField;
-        }
-
-        // Check interfaces of the declared type
-        Optional<String> interfaceField = checkInterfaceFields(declaredType, value);
-        if (interfaceField.isPresent()) {
-            return interfaceField;
-        }
-
-        return Optional.empty();
-    }
-
-    /**
-     * Check class fields and register if found
-     */
-    private static Optional<String> checkAndRegisterClassFields(Class<?> clazz, Object value) {
-        for (Field field : clazz.getDeclaredFields()) {
-            if (Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers())) {
-                try {
-                    field.setAccessible(true);
-                    Object fieldValue = field.get(null);
-
-                    // Register this static field for future lookups
-                    if (fieldValue != null) {
-                        registerStaticField(fieldValue, clazz, field.getName());
-                    }
-
-                    if (fieldValue == value) {
-                        return Optional.of(field.getName());
-                    }
-                } catch (IllegalAccessException e) {
-                    // Continue checking other fields
-                }
-            }
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Helper: Recursively check interface fields for a matching value
-     */
-    private static Optional<String> checkInterfaceFields(Class<?> clazz, Object value) {
-        // Get all interfaces implemented by this class
-        for (Class<?> iface : clazz.getInterfaces()) {
-            // Check fields in this interface
-            Optional<String> interfaceField = Arrays.stream(iface.getDeclaredFields())
-                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                         .filter(field -> {
-                             try {
-                                 field.setAccessible(true);
-                                 return field.get(null) == value;
-                             } catch (IllegalAccessException e) {
-                                 return false;
-                             }
-                         })
-                         .map(Field::getName)
-                         .findFirst();
-
-            if (interfaceField.isPresent()) {
-                return interfaceField;
-            }
-
-            // Recursively check parent interfaces
-            Optional<String> parentInterfaceField = checkInterfaceFields(iface, value);
-            if (parentInterfaceField.isPresent()) {
-                return parentInterfaceField;
-            }
-        }
-
-        // Also check superclass interfaces
-        Class<?> superclass = clazz.getSuperclass();
-        if (superclass != null && superclass != Object.class) {
-            return checkInterfaceFields(superclass, value);
-        }
-
-        return Optional.empty();
     }
 
     /**
