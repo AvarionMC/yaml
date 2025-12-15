@@ -8,8 +8,6 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -18,8 +16,6 @@ import java.util.stream.Collectors;
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class YamlWriter {
-    private static final Pattern GENERIC_TOSTRING_PATTERN = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
-
     private final YamlWrapper yamlWrapper;
 
     /**
@@ -121,15 +117,11 @@ class YamlWriter {
             // Remove the type tag: !!org.avarion.yaml.Material 'A' --> 'A'
             return yamlContent.replaceAll("^!!\\S+\\s+", "");
         }
-        else {
-            // Check for generic toString() pattern and try to find static field name
-            Matcher matcher = GENERIC_TOSTRING_PATTERN.matcher(yamlContent);
-            if (matcher.matches()) {
-                Optional<String> originalName = getStaticFieldName(value);
-                if (originalName.isPresent()) {
-                    return originalName.get();
-                }
-            }
+
+        // Check for static field name (class or interface)
+        Optional<String> originalName = getStaticFieldName(value);
+        if (originalName.isPresent()) {
+            return originalName.get();
         }
 
         return yamlContent;
