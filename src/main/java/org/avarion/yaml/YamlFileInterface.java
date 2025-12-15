@@ -547,7 +547,7 @@ public abstract class YamlFileInterface {
                 Object value = field.get(this);
                 YamlComment comment = field.getAnnotation(YamlComment.class);
 
-                nestedMap.put(keyAnnotation.value(), comment==null ? null:comment.value(), value);
+                nestedMap.put(keyAnnotation.value(), comment==null ? null:comment.value(), value, field.getType());
             }
             else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
                 writeYamlMapField(nestedMap, this, field, mapAnnotation);

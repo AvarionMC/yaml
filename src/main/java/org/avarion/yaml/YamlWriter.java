@@ -32,6 +32,10 @@ class YamlWriter {
      * This is the ONLY place where we check the type of a value.
      */
     private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) {
+        writeValue(yaml, value, firstIndent, indent, null);
+    }
+
+    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent, Class<?> declaredType) {
         if (value instanceof Map) {
             writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
         }
@@ -39,7 +43,7 @@ class YamlWriter {
             writeCollection(yaml, (Collection<?>) value, indent);
         }
         else {
-            writeScalar(yaml, value);
+            writeScalar(yaml, value, declaredType);
         }
     }
 
@@ -51,18 +55,20 @@ class YamlWriter {
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
             Object value = entry.getValue();
+            Class<?> declaredType = null;
 
             // Handle comments from NestedNode
             if (value instanceof NestedMap.NestedNode) {
                 NestedMap.NestedNode node = (NestedMap.NestedNode) value;
                 appendComment(yaml, node.comment, indent);
                 value = node.value;
+                declaredType = node.declaredType;
             }
             yaml.append(firstEntry ? firstIndent:indent);
             firstEntry = false;
 
             yaml.append(key).append(":\n");
-            writeValue(yaml, value, indent + "  ", indent + "  ");
+            writeValue(yaml, value, indent + "  ", indent + "  ", declaredType);
         }
     }
 
@@ -83,14 +89,14 @@ class YamlWriter {
     /**
      * Primitive building block: Write a scalar value (just the formatted value, no newline)
      */
-    private void writeScalar(@NotNull StringBuilder yaml, @Nullable Object value) {
+    private void writeScalar(@NotNull StringBuilder yaml, @Nullable Object value, @Nullable Class<?> declaredType) {
         if (yaml.charAt(yaml.length() - 1)=='\n') {
             yaml.deleteCharAt(yaml.length() - 1);
         }
         if (yaml.charAt(yaml.length() - 1)!=' ') {
             yaml.append(' ');
         }
-        yaml.append(formatValue(value));
+        yaml.append(formatValue(value, declaredType));
         yaml.append('\n');
     }
 
@@ -110,7 +116,7 @@ class YamlWriter {
     /**
      * Primitive building block: Format a scalar value for YAML output
      */
-    private String formatValue(@Nullable Object value) {
+    private String formatValue(@Nullable Object value, @Nullable Class<?> declaredType) {
         String yamlContent = yamlWrapper.dump(value).trim();
 
         if (value instanceof Enum || value instanceof UUID) {
@@ -119,7 +125,7 @@ class YamlWriter {
         }
 
         // Check for static field name (class or interface)
-        Optional<String> originalName = getStaticFieldName(value);
+        Optional<String> originalName = getStaticFieldName(value, declaredType);
         if (originalName.isPresent()) {
             return originalName.get();
         }
@@ -131,33 +137,67 @@ class YamlWriter {
      * Helper: Find the name of a public static field that holds this value
      * Checks both class fields and interface constants
      */
-    private static Optional<String> getStaticFieldName(@Nullable Object value) {
+    private static Optional<String> getStaticFieldName(@Nullable Object value, @Nullable Class<?> declaredType) {
+        if (value == null) return Optional.empty();
+
         try {
             Class<?> clazz = value.getClass();
 
             // First check the class's own declared fields
-            Optional<String> classField = Arrays.stream(clazz.getDeclaredFields())
-                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                         .filter(field -> {
-                             try {
-                                 field.setAccessible(true);
-                                 return field.get(null)==value;
-                             } catch (IllegalAccessException e) {
-                                 return false;
-                             }
-                         })
-                         .map(Field::getName)
-                         .findFirst();
-
+            Optional<String> classField = checkClassFields(clazz, value);
             if (classField.isPresent()) {
                 return classField;
             }
 
-            // Check interface fields (constants)
-            return checkInterfaceFields(clazz, value);
+            // Check interface fields (constants) of the runtime class
+            Optional<String> interfaceField = checkInterfaceFields(clazz, value);
+            if (interfaceField.isPresent()) {
+                return interfaceField;
+            }
+
+            // If we have a declared type, search for interfaces/classes with static fields of that type
+            if (declaredType != null) {
+                return searchByDeclaredType(value, declaredType);
+            }
+
+            return Optional.empty();
         } catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    private static Optional<String> checkClassFields(Class<?> clazz, Object value) {
+        return Arrays.stream(clazz.getDeclaredFields())
+                     .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
+                     .filter(field -> {
+                         try {
+                             field.setAccessible(true);
+                             return field.get(null) == value;
+                         } catch (IllegalAccessException e) {
+                             return false;
+                         }
+                     })
+                     .map(Field::getName)
+                     .findFirst();
+    }
+
+    /**
+     * Search for static fields by checking if the declared type has any interface-like companion with static fields
+     */
+    private static Optional<String> searchByDeclaredType(Object value, Class<?> declaredType) {
+        // First check the declared type itself for static fields
+        Optional<String> directField = checkClassFields(declaredType, value);
+        if (directField.isPresent()) {
+            return directField;
+        }
+
+        // Then check interfaces of the declared type
+        Optional<String> interfaceField = checkInterfaceFields(declaredType, value);
+        if (interfaceField.isPresent()) {
+            return interfaceField;
+        }
+
+        return Optional.empty();
     }
 
     /**
