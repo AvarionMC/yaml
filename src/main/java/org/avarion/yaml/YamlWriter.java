@@ -137,12 +137,14 @@ class YamlWriter {
 
     /**
      * Helper: Find the name of a public static field that holds this value
+     * Checks both class fields and interface constants
      */
     private static Optional<String> getStaticFieldName(@Nullable Object value) {
         try {
             Class<?> clazz = value.getClass();
 
-            return Arrays.stream(clazz.getDeclaredFields())
+            // First check the class's own declared fields
+            Optional<String> classField = Arrays.stream(clazz.getDeclaredFields())
                          .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
                          .filter(field -> {
                              try {
@@ -154,9 +156,56 @@ class YamlWriter {
                          })
                          .map(Field::getName)
                          .findFirst();
+
+            if (classField.isPresent()) {
+                return classField;
+            }
+
+            // Check interface fields (constants)
+            return checkInterfaceFields(clazz, value);
         } catch (Exception e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Helper: Recursively check interface fields for a matching value
+     */
+    private static Optional<String> checkInterfaceFields(Class<?> clazz, Object value) {
+        // Get all interfaces implemented by this class
+        for (Class<?> iface : clazz.getInterfaces()) {
+            // Check fields in this interface
+            Optional<String> interfaceField = Arrays.stream(iface.getDeclaredFields())
+                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
+                         .filter(field -> {
+                             try {
+                                 field.setAccessible(true);
+                                 return field.get(null) == value;
+                             } catch (IllegalAccessException e) {
+                                 return false;
+                             }
+                         })
+                         .map(Field::getName)
+                         .findFirst();
+
+            if (interfaceField.isPresent()) {
+                return interfaceField;
+            }
+
+            // Recursively check parent interfaces
+            Optional<String> parentInterfaceField = checkInterfaceFields(iface, value);
+            if (parentInterfaceField.isPresent()) {
+                return parentInterfaceField;
+            }
+        }
+
+        // Also check superclass interfaces
+        Class<?> superclass = clazz.getSuperclass();
+        if (superclass != null && superclass != Object.class) {
+            return checkInterfaceFields(superclass, value);
+        }
+
+        return Optional.empty();
     }
 
     /**
