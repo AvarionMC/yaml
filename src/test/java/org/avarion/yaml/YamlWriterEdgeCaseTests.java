@@ -21,7 +21,8 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         EdgeCaseClass loaded = new EdgeCaseClass().load(target);
 
-        assertNull(loaded.emptyList);
+        assertNotNull(loaded.emptyList);
+        assertTrue(loaded.emptyList.isEmpty());
     }
 
     @Test
@@ -31,7 +32,8 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         EdgeCaseClass loaded = new EdgeCaseClass().load(target);
 
-        assertNull(loaded.emptySet);
+        assertNotNull(loaded.emptySet);
+        assertTrue(loaded.emptySet.isEmpty());
     }
 
     @Test
