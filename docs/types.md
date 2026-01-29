@@ -6,16 +6,16 @@ YamlAnnotations supports a wide variety of Java types for seamless YAML serializ
 
 All Java primitives and their wrapper classes are supported:
 
-| Primitive | Wrapper | Example YAML |
-|-----------|---------|--------------|
-| `byte` | `Byte` | `value: 127` |
-| `short` | `Short` | `value: 32767` |
-| `int` | `Integer` | `value: 42` |
-| `long` | `Long` | `value: 9223372036854775807` |
-| `float` | `Float` | `value: 3.14` |
-| `double` | `Double` | `value: 3.141592653589793` |
-| `boolean` | `Boolean` | `value: true` |
-| `char` | `Character` | `value: A` |
+| Primitive | Wrapper     | Example YAML                 |
+|-----------|-------------|------------------------------|
+| `byte`    | `Byte`      | `value: 127`                 |
+| `short`   | `Short`     | `value: 32767`               |
+| `int`     | `Integer`   | `value: 42`                  |
+| `long`    | `Long`      | `value: 9223372036854775807` |
+| `float`   | `Float`     | `value: 3.14`                |
+| `double`  | `Double`    | `value: 3.141592653589793`   |
+| `boolean` | `Boolean`   | `value: true`                |
+| `char`    | `Character` | `value: A`                   |
 
 ```java
 public class PrimitiveConfig extends YamlFileInterface {
@@ -266,4 +266,4 @@ optional-value: null
 
 ## Type Conversion with Leniency
 
-See [Leniency Modes](advanced.md#leniency-modes) for how type conversion behaves in strict vs lenient modes.
+See [Leniency Modes](advanced.md#leniency-modes) for how type conversion behaves in strict versus lenient modes.

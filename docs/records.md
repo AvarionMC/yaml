@@ -303,13 +303,13 @@ server:
 
 ## Records vs @YamlMap
 
-| Feature | Records | @YamlMap |
-|---------|---------|----------|
-| Syntax | Clean, declarative | Verbose, imperative |
-| Immutability | Immutable by design | Mutable |
-| Boilerplate | Minimal | Requires processor class |
-| Complex logic | Limited | Full control |
-| Validation | Constructor only | Custom in processor |
-| Best for | Data transfer objects | Complex transformations |
+| Feature       | Records               | @YamlMap                 |
+|---------------|-----------------------|--------------------------|
+| Syntax        | Clean, declarative    | Verbose, imperative      |
+| Immutability  | Immutable by design   | Mutable                  |
+| Boilerplate   | Minimal               | Requires processor class |
+| Complex logic | Limited               | Full control             |
+| Validation    | Constructor only      | Custom in processor      |
+| Best for      | Data transfer objects | Complex transformations  |
 
 **Recommendation:** Use Records for most cases. Use `@YamlMap` only when you need custom serialization logic.

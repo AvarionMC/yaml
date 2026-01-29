@@ -19,11 +19,11 @@ public class MyConfig extends YamlFileInterface {
 
 ### Attributes
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `header` | `String` | `""` | Comment text that appears at the top of the YAML file |
-| `fileName` | `String` | `"config.yml"` | Default filename when using `load(plugin)` or `save(plugin)` |
-| `lenient` | `Leniency` | `STRICT` | Default leniency mode for all fields |
+| Attribute  | Type       | Default        | Description                                                  |
+|------------|------------|----------------|--------------------------------------------------------------|
+| `header`   | `String`   | `""`           | Comment text that appears at the top of the YAML file        |
+| `fileName` | `String`   | `"config.yml"` | Default filename when using `load(plugin)` or `save(plugin)` |
+| `lenient`  | `Leniency` | `STRICT`       | Default leniency mode for all fields                         |
 
 ### Example with Header
 
@@ -68,10 +68,10 @@ public String myField = "default";
 
 ### Attributes
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `value` | `String` | *required* | The YAML key path (supports dot notation for nesting) |
-| `lenient` | `Leniency` | `UNDEFINED` | Leniency mode for this specific field |
+| Attribute | Type       | Default     | Description                                           |
+|-----------|------------|-------------|-------------------------------------------------------|
+| `value`   | `String`   | *required*  | The YAML key path (supports dot notation for nesting) |
+| `lenient` | `Leniency` | `UNDEFINED` | Leniency mode for this specific field                 |
 
 ### Dot Notation for Nested Keys
 
@@ -185,9 +185,9 @@ public Map<String, MyObject> myMap = new HashMap<>();
 
 ### Attributes
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `value` | `String` | *required* | The YAML key path for the map |
+| Attribute   | Type       | Default    | Description                             |
+|-------------|------------|------------|-----------------------------------------|
+| `value`     | `String`   | *required* | The YAML key path for the map           |
 | `processor` | `Class<?>` | *required* | A class implementing `YamlMapProcessor` |
 
 ### Creating a Processor
@@ -257,12 +257,12 @@ players:
 
 ### When to Use @YamlMap vs Records
 
-| Use Case | Recommendation |
-|----------|----------------|
-| Simple data structures | Use [Records](records.md) - cleaner and automatic |
-| Complex transformation logic | Use `@YamlMap` with custom processor |
-| Legacy classes you can't modify | Use `@YamlMap` with custom processor |
-| Need validation during load | Use `@YamlMap` with custom processor |
+| Use Case                        | Recommendation                                    |
+|---------------------------------|---------------------------------------------------|
+| Simple data structures          | Use [Records](records.md) - cleaner and automatic |
+| Complex transformation logic    | Use `@YamlMap` with custom processor              |
+| Legacy classes you can't modify | Use `@YamlMap` with custom processor              |
+| Need validation during load     | Use `@YamlMap` with custom processor              |
 
 ---
 

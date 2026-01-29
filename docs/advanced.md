@@ -8,11 +8,11 @@ Leniency controls how strictly type conversions are enforced during YAML loading
 
 ### Leniency Levels
 
-| Level | Description |
-|-------|-------------|
-| `STRICT` | Exact type matching required; throws exceptions on mismatches |
-| `LENIENT` | Attempts automatic type coercion when possible |
-| `UNDEFINED` | Inherits from parent (`@YamlFile` or defaults to `STRICT`) |
+| Level       | Description                                                   |
+|-------------|---------------------------------------------------------------|
+| `STRICT`    | Exact type matching required; throws exceptions on mismatches |
+| `LENIENT`   | Attempts automatic type coercion when possible                |
+| `UNDEFINED` | Inherits from parent (`@YamlFile` or defaults to `STRICT`)    |
 
 ### Setting Leniency
 
@@ -47,10 +47,10 @@ public class Config extends YamlFileInterface {
 char-field: "Hello"
 ```
 
-| Mode | Result |
-|------|--------|
-| `STRICT` | Throws `IOException` - string too long |
-| `LENIENT` | Takes first character: `'H'` |
+| Mode      | Result                                 |
+|-----------|----------------------------------------|
+| `STRICT`  | Throws `IOException` - string too long |
+| `LENIENT` | Takes first character: `'H'`           |
 
 #### Float Precision
 
@@ -58,9 +58,9 @@ char-field: "Hello"
 float-field: 0.123456789
 ```
 
-| Mode | Result |
-|------|--------|
-| `STRICT` | Throws `IOException` - precision loss |
+| Mode      | Result                                      |
+|-----------|---------------------------------------------|
+| `STRICT`  | Throws `IOException` - precision loss       |
 | `LENIENT` | Converts with precision loss: `0.12345679f` |
 
 #### Single Value to Collection
@@ -69,10 +69,10 @@ float-field: 0.123456789
 list-field: "single-item"
 ```
 
-| Mode | Result |
-|------|--------|
-| `STRICT` | Throws `IOException` - expected list |
-| `LENIENT` | Wraps in list: `["single-item"]` |
+| Mode      | Result                               |
+|-----------|--------------------------------------|
+| `STRICT`  | Throws `IOException` - expected list |
+| `LENIENT` | Wraps in list: `["single-item"]`     |
 
 ---
 
@@ -225,12 +225,12 @@ public class MyPlugin extends JavaPlugin {
 
 ### Common Exceptions
 
-| Exception | Cause |
-|-----------|-------|
-| `IOException` | File read/write errors, type conversion failures |
-| `FinalAttribute` | Attempting to use `@YamlKey` on a `final` field |
-| `DuplicateKey` | Same key path used multiple times |
-| `IllegalStateException` | Both `@YamlKey` and `@YamlMap` on same field |
+| Exception               | Cause                                            |
+|-------------------------|--------------------------------------------------|
+| `IOException`           | File read/write errors, type conversion failures |
+| `FinalAttribute`        | Attempting to use `@YamlKey` on a `final` field  |
+| `DuplicateKey`          | Same key path used multiple times                |
+| `IllegalStateException` | Both `@YamlKey` and `@YamlMap` on same field     |
 
 ### Handling Missing Fields
 
