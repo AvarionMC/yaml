@@ -13,7 +13,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
-import java.util.function.Supplier;
 
 /**
  * Abstract class providing utility methods to handle YAML files, including
@@ -24,374 +23,8 @@ public abstract class YamlFileInterface {
     static final Object UNKNOWN = new Object();
     private static final YamlWrapper yaml = YamlWrapperFactory.create();
     private static final YamlWriter yamlWriter = new YamlWriter(yaml);
-    private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
-    private static final Map<Class<?>, Supplier<Collection<Object>>> COLLECTION_FACTORIES;
-
-    static {
-        COLLECTION_FACTORIES = new HashMap<>();
-        COLLECTION_FACTORIES.put(Set.class, LinkedHashSet::new);
-        COLLECTION_FACTORIES.put(List.class, ArrayList::new);
-        COLLECTION_FACTORIES.put(Queue.class, ArrayDeque::new);
-    }
-
-    private static @Nullable Object getConvertedValue(final @NotNull Field field, final Object value, boolean isLenient) throws IOException {
-        return getConvertedValue(field, field.getType(), value, isLenient);
-    }
-
-    private static @Nullable Object getFieldValue(final @NotNull Class<?> expectedType, final String fieldName)
-            throws NoSuchFieldException, IllegalAccessException {
-        Field found = null;
-        try {
-            found = expectedType.getDeclaredField(fieldName);
-        } catch (NoSuchFieldException ignored) {
-        }
-
-        if (found==null) {
-            final String replacedName = fieldName.replace('.', '_');
-            for (Field field : expectedType.getDeclaredFields()) {
-                if (field.getName().equalsIgnoreCase(fieldName) || field.getName().equalsIgnoreCase(replacedName)) {
-                    found = field;
-                    break;
-                }
-            }
-        }
-
-        if (found==null) {
-            throw new NoSuchFieldException(fieldName);
-        }
-
-        found.setAccessible(true);
-        return found.get(null);
-    }
-
-    private static @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value, boolean isLenient)
-            throws IOException {
-        if (value==null) {
-            return handleNullValue(expectedType, field);
-        }
-
-        // If expected type is Object, return value as-is for collections and maps
-        // since we don't have type information to guide conversion
-        if (expectedType == Object.class && (value instanceof Collection || value instanceof Map)) {
-            return value;
-        }
-
-        if (expectedType.isEnum() && value instanceof String) {
-            return stringToEnum((Class<? extends Enum>) expectedType, (String) value);
-        }
-
-        if (value instanceof List<?>) {
-            return handleCollectionValue(field, expectedType, (Collection<?>) value, isLenient);
-        }
-        if (Collection.class.isAssignableFrom(expectedType) && isLenient) {
-            // We allow a single String/int/... to be assigned to a Collection -- but only when we're in lenient mode
-            return handleCollectionValue(field, expectedType, List.of(value), isLenient);
-        }
-
-        if (value instanceof Map && Map.class.isAssignableFrom(expectedType)) {
-            return handleMapValue(field, expectedType, (Map<?, ?>) value, isLenient);
-        }
-
-        if (expectedType.isInstance(value)) {
-            return value;
-        }
-
-        if (value instanceof String && expectedType.equals(UUID.class)) {
-            return UUID.fromString((String) value);
-        }
-
-        if (isBooleanType(expectedType)) {
-            return convertToBoolean(value);
-        }
-
-        if (Number.class.isAssignableFrom(value.getClass())) {
-            return convertToNumber((Number) value, expectedType, isLenient);
-        }
-
-        if (isCharacterType(expectedType)) {
-            return convertToCharacter(String.valueOf(value), isLenient);
-        }
-
-        // Handle Records: convert Map to Record using canonical constructor
-        if (value instanceof Map && expectedType.isRecord()) {
-            return convertMapToRecord(expectedType, (Map<?, ?>) value, isLenient);
-        }
-
-        // For other classes, attempt to use their constructor that takes a String parameter
-        try {
-            Constructor<?> constructor = expectedType.getConstructor(String.class);
-            return constructor.newInstance(value.toString());
-        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException ignored) {
-        }
-
-        try {
-            return getFieldValue(expectedType, value.toString());
-        } catch (IllegalAccessException | NoSuchFieldException ignored) {
-        }
-
-        throw new IOException("'" + expectedType.getSimpleName() + "': I cannot figure out how to retrieve this type.");
-    }
-
-    private static @Nullable Object handleNullValue(final @NotNull Class<?> expectedType, final Field field) throws IOException {
-        if (expectedType.isPrimitive()) {
-            String message = "Cannot assign null to primitive type " + expectedType.getSimpleName();
-            if (field!=null) {
-                message += " (field: " + field.getName() + ")";
-            }
-            throw new IOException(message);
-        }
-        return null;
-    }
-
-    /**
-     * Extract the raw Class from a Type, handling both Class and ParameterizedType
-     */
-    private static Class<?> getRawClass(Type type) {
-        if (type instanceof Class<?>) {
-            return (Class<?>) type;
-        } else if (type instanceof ParameterizedType) {
-            Type rawType = ((ParameterizedType) type).getRawType();
-            if (rawType instanceof Class<?>) {
-                return (Class<?>) rawType;
-            }
-        }
-        return Object.class;
-    }
-
-    /**
-     * Convert the incoming value into a Set/List
-     */
-    private static @NotNull Object handleCollectionValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection, boolean isLenient) throws IOException {
-
-        Collection<Object> result = createCollectionInstance(expectedType);
-
-        // Extract element type from Field's generic type if available
-        Type elementType = Object.class;
-        if (field != null && field.getGenericType() instanceof ParameterizedType) {
-            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
-            if (typeArgs.length > 0) {
-                elementType = typeArgs[0];
-            }
-        }
-
-        for (Object item : collection) {
-            Object convertedValue = convertWithType(elementType, item, isLenient);
-            result.add(convertedValue);
-        }
-        return result;
-    }
-
-    /**
-     * Convert the incoming value into a Map with properly typed keys and values
-     */
-    private static @NotNull Object handleMapValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
-
-        Map<Object, Object> result = new LinkedHashMap<>();
-
-        // Extract key/value types from Field's generic type if available
-        Type keyType = Object.class;
-        Type valueType = Object.class;
-        if (field != null && field.getGenericType() instanceof ParameterizedType) {
-            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
-            if (typeArgs.length > 0) keyType = typeArgs[0];
-            if (typeArgs.length > 1) valueType = typeArgs[1];
-        }
-
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
-            Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
-            result.put(convertedKey, convertedValue);
-        }
-        return result;
-    }
-
-    /**
-     * Convert a value using Type information (handles both Class and ParameterizedType)
-     * This method ONLY handles parameterized types (Maps/Collections with generic info).
-     * For simple types, it delegates to getConvertedValue to avoid code duplication.
-     */
-    private static @Nullable Object convertWithType(final @NotNull Type type, final Object value, boolean isLenient) throws IOException {
-        Class<?> rawClass = getRawClass(type);
-
-        if (value == null) {
-            return handleNullValue(rawClass, null);
-        }
-
-        // Handle Maps with type information (only if type is parameterized)
-        if (value instanceof Map && Map.class.isAssignableFrom(rawClass)) {
-            Map<Object, Object> result = new LinkedHashMap<>();
-
-            // Extract type arguments if this is a ParameterizedType
-            Type keyType = Object.class;
-            Type valueType = Object.class;
-            if (type instanceof ParameterizedType) {
-                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
-                if (typeArgs.length > 0) keyType = typeArgs[0];
-                if (typeArgs.length > 1) valueType = typeArgs[1];
-            }
-
-            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
-                Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
-                Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
-                result.put(convertedKey, convertedValue);
-            }
-            return result;
-        }
-
-        // Handle Collections with type information (only if type is parameterized)
-        if (value instanceof Collection && Collection.class.isAssignableFrom(rawClass)) {
-            Collection<Object> result = createCollectionInstance(rawClass);
-
-            // Extract element type if this is a ParameterizedType
-            Type elementType = Object.class;
-            if (type instanceof ParameterizedType) {
-                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
-                if (typeArgs.length > 0) elementType = typeArgs[0];
-            }
-
-            for (Object item : (Collection<?>) value) {
-                Object convertedItem = convertWithType(elementType, item, isLenient);
-                result.add(convertedItem);
-            }
-            return result;
-        }
-
-        // For all other types (primitives, String, enums, UUID, numbers, chars, etc.),
-        // delegate to getConvertedValue which has all the conversion logic in one place.
-        // This avoids code duplication.
-        return getConvertedValue(null, rawClass, value, isLenient);
-    }
-
-    private static Collection<Object> createCollectionInstance(@NotNull Class<?> expectedType) throws IOException {
-        Supplier<Collection<Object>> factory = COLLECTION_FACTORIES.entrySet()
-                                                                   .stream()
-                                                                   .filter(entry -> entry.getKey().isAssignableFrom(expectedType))
-                                                                   .map(Map.Entry::getValue)
-                                                                   .findFirst()
-                                                                   .orElseThrow(() -> new IOException(
-                                                                           "Unsupported collection type: " + expectedType.getSimpleName()));
-        return factory.get();
-    }
-
-    private static boolean isBooleanType(final Class<?> type) {
-        return type==boolean.class || type==Boolean.class;
-    }
-
-    private static @NotNull Boolean convertToBoolean(final Object value) {
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        }
-
-        final String strValue = value.toString().toLowerCase().trim();
-        return TRUE_VALUES.contains(strValue);
-    }
-
-    private static Object convertToNumber(final Number numValue, final Class<?> expectedType, boolean isLenient) throws IOException {
-        if (expectedType==int.class || expectedType==Integer.class) {
-            return numValue.intValue();
-        }
-        if (expectedType==double.class || expectedType==Double.class) {
-            return numValue.doubleValue();
-        }
-        if (expectedType==float.class || expectedType==Float.class) {
-            return convertToFloat(numValue, isLenient);
-        }
-        if (expectedType==long.class || expectedType==Long.class) {
-            return numValue.longValue();
-        }
-        if (expectedType==short.class || expectedType==Short.class) {
-            return numValue.shortValue();
-        }
-        if (expectedType==byte.class || expectedType==Byte.class) {
-            return numValue.byteValue();
-        }
-        throw new IOException("Cannot convert " + numValue.getClass().getSimpleName() + " to " + expectedType.getSimpleName());
-    }
-
-    private static float convertToFloat(final @NotNull Number numValue, boolean isLenient) throws IOException {
-        double doubleValue = numValue.doubleValue();
-        if (!isLenient && Math.abs(doubleValue - (float) doubleValue) >= 1e-9) {
-            throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
-        }
-        return numValue.floatValue();
-    }
-
-    private static boolean isCharacterType(final Class<?> type) {
-        return type==char.class || type==Character.class;
-    }
-
-    private static @NotNull Character convertToCharacter(final @NotNull String value, boolean isLenient) throws IOException {
-        if (value.length()==1 || isLenient) {
-            return value.charAt(0);
-        }
-
-        throw new IOException("Cannot convert String of length " + value.length() + " to Character");
-    }
-
-    private static <E extends Enum<E>> @NotNull E stringToEnum(final Class<E> enumClass, final @NotNull String value) {
-        return Enum.valueOf(enumClass, value.toUpperCase());
-    }
-
-    /**
-     * Converts a Map to a Record instance by matching map keys to record component names.
-     * Supports nested records: if a component is itself a record and the value is a Map,
-     * it will recursively convert the nested Map to the nested record type.
-     */
-    private static @NotNull Object convertMapToRecord(final @NotNull Class<?> recordClass, final @NotNull Map<?, ?> map, boolean isLenient)
-            throws IOException {
-        RecordComponent[] components = recordClass.getRecordComponents();
-        Object[] args = new Object[components.length];
-
-        for (int i = 0; i < components.length; i++) {
-            RecordComponent component = components[i];
-            String componentName = component.getName();
-            Class<?> componentType = component.getType();
-            Type genericType = component.getGenericType();
-
-            Object value = map.get(componentName);
-
-            if (value == null) {
-                // Handle null: primitives cannot be null
-                if (componentType.isPrimitive()) {
-                    throw new IOException("Cannot assign null to primitive record component '" + componentName +
-                            "' in record " + recordClass.getSimpleName());
-                }
-                args[i] = null;
-            }
-            else if (value instanceof Map && componentType.isRecord()) {
-                // Nested record: recursively convert
-                args[i] = convertMapToRecord(componentType, (Map<?, ?>) value, isLenient);
-            }
-            else if (value instanceof Map && Map.class.isAssignableFrom(componentType)) {
-                // Map field within record: use convertWithType for proper type handling
-                args[i] = convertWithType(genericType, value, isLenient);
-            }
-            else if (value instanceof Collection && Collection.class.isAssignableFrom(componentType)) {
-                // Collection field within record: use convertWithType for proper type handling
-                args[i] = convertWithType(genericType, value, isLenient);
-            }
-            else {
-                // Regular field: use getConvertedValue for type coercion
-                args[i] = getConvertedValue(null, componentType, value, isLenient);
-            }
-        }
-
-        try {
-            // Get the canonical constructor (matches all record components in order)
-            Class<?>[] paramTypes = Arrays.stream(components)
-                                          .map(RecordComponent::getType)
-                                          .toArray(Class<?>[]::new);
-            Constructor<?> constructor = recordClass.getDeclaredConstructor(paramTypes);
-            constructor.setAccessible(true);
-            return constructor.newInstance(args);
-        }
-        catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-            throw new IOException("Failed to instantiate record " + recordClass.getSimpleName() + ": " + e.getMessage(), e);
-        }
-    }
+    // ==================== Load Methods ====================
 
     /**
      * Loads the YAML content from the specified file into this object.
@@ -421,7 +54,7 @@ public abstract class YamlFileInterface {
 
         Class<?> clazz = this.getClass();
         YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
-        boolean isLenientByDefault = yamlFileAnnotation!=null && yamlFileAnnotation.lenient()==Leniency.LENIENT;
+        boolean isLenientByDefault = yamlFileAnnotation != null && yamlFileAnnotation.lenient() == Leniency.LENIENT;
 
         try {
             loadFields(data, isLenientByDefault);
@@ -429,30 +62,6 @@ public abstract class YamlFileInterface {
             throw new IOException(e);
         }
         return (T) this;
-    }
-
-    private void loadFields(Map<String, Object> data, boolean isLenientByDefault) throws FinalAttribute, IllegalAccessException, IOException {
-        if (data==null) {
-            data = new HashMap<>();
-        }
-
-        for (Class<?> clazz = this.getClass(); clazz!=null; clazz = clazz.getSuperclass()) {
-            for (Field field : clazz.getDeclaredFields()) {
-                YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-                YamlMap mapAnnotation = field.getAnnotation(YamlMap.class);
-
-                if (keyAnnotation!=null && mapAnnotation!=null) {
-                    throw new IllegalStateException("Field " + field.getName() + " cannot have both @YamlKey and @YamlMap annotations");
-                }
-
-                if (keyAnnotation!=null && !keyAnnotation.value().trim().isEmpty()) {
-                    readYamlKeyField(data, field, keyAnnotation, isLenientByDefault);
-                }
-                else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
-                    readYamlMapField(data, field, mapAnnotation);
-                }
-            }
-        }
     }
 
     /**
@@ -499,135 +108,7 @@ public abstract class YamlFileInterface {
         return load(getYamlFile(plugin));
     }
 
-    @Contract("_ -> new")
-    private @NotNull File getYamlFile(final @NotNull Object plugin) throws IOException {
-        try {
-            // Get the YamlFile annotation from this class
-            YamlFile yamlFileAnnotation = this.getClass().getAnnotation(YamlFile.class);
-            String filename = yamlFileAnnotation==null ? "config.yml":yamlFileAnnotation.fileName();
-            if (filename.trim().isEmpty()) {
-                throw new IOException("Wrong filename specified in `@YamlFile` annotation");
-            }
-
-            // Use reflection to get the getDataFolder method from the plugin
-            Method dataFolderMethod = getDataFolderMethod(plugin);
-            Class<?> returnType = dataFolderMethod.getReturnType();
-            if (!File.class.isAssignableFrom(returnType)) {
-                throw new IOException("getDataFolder method does not return a File object, but returns: " + returnType.getName() + " instead");
-            }
-
-            File dataFolder = (File) dataFolderMethod.invoke(plugin);
-            if (dataFolder==null || (dataFolder.exists() && !dataFolder.isDirectory())) {
-                throw new IOException("getDataFolder() method returned a non-existing directory");
-            }
-
-            // Create the full path by combining data folder and filename
-            return new File(dataFolder, filename);
-        } catch (NoSuchMethodException e) {
-            throw new IOException("Plugin does not have a getDataFolder() method with no parameters", e);
-        } catch (IllegalAccessException e) {
-            throw new IOException("getDataFolder() method must be public", e);
-        } catch (InvocationTargetException e) {
-            throw new IOException(e.getMessage(), e);
-        } catch (ClassCastException e) {
-            throw new IOException(e.getMessage(), e);
-        }
-    }
-
-    private static @NotNull Method getDataFolderMethod(@NotNull Object plugin) throws IOException, NoSuchMethodException {
-        Method getDataFolderMethod = null;
-        Class<?> currentClass = plugin.getClass();
-        while (currentClass!=null && getDataFolderMethod==null) {
-            try {
-                getDataFolderMethod = currentClass.getDeclaredMethod("getDataFolder");
-                if (!Modifier.isPublic(getDataFolderMethod.getModifiers())) {
-                    throw new IOException("getDataFolder() method must be public");
-                }
-            } catch (NoSuchMethodException e) {
-                currentClass = currentClass.getSuperclass();
-            }
-        }
-
-        if (getDataFolderMethod==null) {
-            throw new NoSuchMethodException("getDataFolder() method not found in class hierarchy");
-        }
-
-        return getDataFolderMethod;
-    }
-
-    private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull String[] keys) {
-        return getNestedValue(map, new ArrayList<>(Arrays.asList(keys)));
-    }
-
-    private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull List<String> keys) {
-        final String key = keys.remove(0);
-
-        if (!map.containsKey(key)) {
-            // Unknown inside the map
-            return UNKNOWN;
-        }
-
-        Object tmp = map.get(key);
-
-        if (keys.isEmpty()) {
-            // Final element
-            return tmp;
-        }
-
-        if (!(tmp instanceof Map)) {
-            // If it's not a map, and we still have deeper to dig --> No clue what that is?!
-            return UNKNOWN;
-        }
-
-        // Go deeper...
-        return getNestedValue((Map<String, Object>) tmp, keys);
-    }
-
-    private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey, IOException {
-
-        StringBuilder result = new StringBuilder();
-
-        // Get YAML file header if present
-        Class<?> clazz = this.getClass();
-        YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
-        if (yamlFileAnnotation!=null && !yamlFileAnnotation.header().trim().isEmpty()) {
-            appendHeaderComment(result, yamlFileAnnotation.header());
-            result.append("\n");
-        }
-
-        // Fields
-        NestedMap nestedMap = new NestedMap();
-        for (Field field : clazz.getDeclaredFields()) {
-            YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-            YamlMap mapAnnotation = field.getAnnotation(YamlMap.class);
-
-            if (keyAnnotation!=null && !keyAnnotation.value().trim().isEmpty()) {
-                if (Modifier.isFinal(field.getModifiers())) {
-                    throw new FinalAttribute(field.getName());
-                }
-
-                field.setAccessible(true);
-                Object value = field.get(this);
-                YamlComment comment = field.getAnnotation(YamlComment.class);
-
-                nestedMap.put(keyAnnotation.value(), comment==null ? null:comment.value(), value);
-            }
-            else if (mapAnnotation!=null && !mapAnnotation.value().trim().isEmpty()) {
-                writeYamlMapField(nestedMap, this, field, mapAnnotation);
-            }
-        }
-
-        // 3. Convert the nested map to YAML using YamlWriter
-        result.append(yamlWriter.write(nestedMap.getMap()));
-
-        return result.toString();
-    }
-
-    private void appendHeaderComment(StringBuilder result, String header) {
-        for (String line : header.split("\\r?\\n")) {
-            result.append("# ").append(line.replaceAll("\\s*$", "")).append("\n");
-        }
-    }
+    // ==================== Save Methods ====================
 
     /**
      * Saves the current object's content to the specified file in YAML format.
@@ -691,6 +172,32 @@ public abstract class YamlFileInterface {
         save(getYamlFile(plugin));
     }
 
+    // ==================== Field Processing ====================
+
+    private void loadFields(Map<String, Object> data, boolean isLenientByDefault) throws FinalAttribute, IllegalAccessException, IOException {
+        if (data == null) {
+            data = new HashMap<>();
+        }
+
+        for (Class<?> clazz = this.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
+            for (Field field : clazz.getDeclaredFields()) {
+                YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
+                YamlMap mapAnnotation = field.getAnnotation(YamlMap.class);
+
+                if (keyAnnotation != null && mapAnnotation != null) {
+                    throw new IllegalStateException("Field " + field.getName() + " cannot have both @YamlKey and @YamlMap annotations");
+                }
+
+                if (keyAnnotation != null && !keyAnnotation.value().trim().isEmpty()) {
+                    readYamlKeyField(data, field, keyAnnotation, isLenientByDefault);
+                }
+                else if (mapAnnotation != null && !mapAnnotation.value().trim().isEmpty()) {
+                    readYamlMapField(data, field, mapAnnotation);
+                }
+            }
+        }
+    }
+
     private void readYamlKeyField(Map<String, Object> data, @NotNull Field field, @NotNull YamlKey annotation, boolean isLenientByDefault)
             throws FinalAttribute, IllegalAccessException, IOException {
         if (Modifier.isFinal(field.getModifiers())) {
@@ -701,21 +208,9 @@ public abstract class YamlFileInterface {
         boolean isLenient = isLenient(annotation.lenient(), isLenientByDefault);
 
         Object value = getNestedValue(data, key.split("\\."));
-        if (value!=UNKNOWN) {
+        if (value != UNKNOWN) {
             field.setAccessible(true);
-            field.set(this, getConvertedValue(field, value, isLenient));
-        }
-    }
-
-    @Contract(pure = true)
-    private static boolean isLenient(@NotNull Leniency leniency, boolean isLenientByDefault) {
-        switch (leniency) {
-            case LENIENT:
-                return true;
-            case UNDEFINED:
-                return isLenientByDefault;
-            default:
-                return false;
+            field.set(this, TypeConverter.getConvertedValue(field, value, isLenient));
         }
     }
 
@@ -726,7 +221,7 @@ public abstract class YamlFileInterface {
 
         String mapKey = annotation.value();
         Object mapValue = getNestedValue(data, mapKey.split("\\."));
-        if (mapValue==UNKNOWN || mapValue==null) {
+        if (mapValue == UNKNOWN || mapValue == null) {
             return; // Not provided: don't change the default values
         }
 
@@ -746,6 +241,48 @@ public abstract class YamlFileInterface {
         } catch (InstantiationException | NoSuchMethodException | InvocationTargetException | ClassCastException e) {
             throw new IllegalStateException("Failed to instantiate YamlMapProcessor", e);
         }
+    }
+
+    // ==================== YAML Building ====================
+
+    private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey, IOException {
+
+        StringBuilder result = new StringBuilder();
+
+        // Get YAML file header if present
+        Class<?> clazz = this.getClass();
+        YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
+        if (yamlFileAnnotation != null && !yamlFileAnnotation.header().trim().isEmpty()) {
+            appendHeaderComment(result, yamlFileAnnotation.header());
+            result.append("\n");
+        }
+
+        // Fields
+        NestedMap nestedMap = new NestedMap();
+        for (Field field : clazz.getDeclaredFields()) {
+            YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
+            YamlMap mapAnnotation = field.getAnnotation(YamlMap.class);
+
+            if (keyAnnotation != null && !keyAnnotation.value().trim().isEmpty()) {
+                if (Modifier.isFinal(field.getModifiers())) {
+                    throw new FinalAttribute(field.getName());
+                }
+
+                field.setAccessible(true);
+                Object value = field.get(this);
+                YamlComment comment = field.getAnnotation(YamlComment.class);
+
+                nestedMap.put(keyAnnotation.value(), comment == null ? null : comment.value(), value);
+            }
+            else if (mapAnnotation != null && !mapAnnotation.value().trim().isEmpty()) {
+                writeYamlMapField(nestedMap, this, field, mapAnnotation);
+            }
+        }
+
+        // Convert the nested map to YAML using YamlWriter
+        result.append(yamlWriter.write(nestedMap.getMap()));
+
+        return result.toString();
     }
 
     private void writeYamlMapField(NestedMap nestedMap, Object obj, @NotNull Field field, @NotNull YamlMap annotation)
@@ -768,6 +305,114 @@ public abstract class YamlFileInterface {
             } catch (InstantiationException | NoSuchMethodException | InvocationTargetException e) {
                 throw new IllegalStateException("Failed to instantiate YamlMapProcessor", e);
             }
+        }
+    }
+
+    private void appendHeaderComment(StringBuilder result, String header) {
+        for (String line : header.split("\\r?\\n")) {
+            result.append("# ").append(line.replaceAll("\\s*$", "")).append("\n");
+        }
+    }
+
+    // ==================== Nested Value Navigation ====================
+
+    private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull String[] keys) {
+        return getNestedValue(map, new ArrayList<>(Arrays.asList(keys)));
+    }
+
+    private static @Nullable Object getNestedValue(final @NotNull Map<String, Object> map, final @NotNull List<String> keys) {
+        final String key = keys.remove(0);
+
+        if (!map.containsKey(key)) {
+            // Unknown inside the map
+            return UNKNOWN;
+        }
+
+        Object tmp = map.get(key);
+
+        if (keys.isEmpty()) {
+            // Final element
+            return tmp;
+        }
+
+        if (!(tmp instanceof Map)) {
+            // If it's not a map, and we still have deeper to dig --> No clue what that is?!
+            return UNKNOWN;
+        }
+
+        // Go deeper...
+        return getNestedValue((Map<String, Object>) tmp, keys);
+    }
+
+    // ==================== Plugin Utilities ====================
+
+    @Contract("_ -> new")
+    private @NotNull File getYamlFile(final @NotNull Object plugin) throws IOException {
+        try {
+            // Get the YamlFile annotation from this class
+            YamlFile yamlFileAnnotation = this.getClass().getAnnotation(YamlFile.class);
+            String filename = yamlFileAnnotation == null ? "config.yml" : yamlFileAnnotation.fileName();
+            if (filename.trim().isEmpty()) {
+                throw new IOException("Wrong filename specified in `@YamlFile` annotation");
+            }
+
+            // Use reflection to get the getDataFolder method from the plugin
+            Method dataFolderMethod = getDataFolderMethod(plugin);
+            Class<?> returnType = dataFolderMethod.getReturnType();
+            if (!File.class.isAssignableFrom(returnType)) {
+                throw new IOException("getDataFolder method does not return a File object, but returns: " + returnType.getName() + " instead");
+            }
+
+            File dataFolder = (File) dataFolderMethod.invoke(plugin);
+            if (dataFolder == null || (dataFolder.exists() && !dataFolder.isDirectory())) {
+                throw new IOException("getDataFolder() method returned a non-existing directory");
+            }
+
+            // Create the full path by combining data folder and filename
+            return new File(dataFolder, filename);
+        } catch (NoSuchMethodException e) {
+            throw new IOException("Plugin does not have a getDataFolder() method with no parameters", e);
+        } catch (IllegalAccessException e) {
+            throw new IOException("getDataFolder() method must be public", e);
+        } catch (InvocationTargetException e) {
+            throw new IOException(e.getMessage(), e);
+        } catch (ClassCastException e) {
+            throw new IOException(e.getMessage(), e);
+        }
+    }
+
+    private static @NotNull Method getDataFolderMethod(@NotNull Object plugin) throws IOException, NoSuchMethodException {
+        Method getDataFolderMethod = null;
+        Class<?> currentClass = plugin.getClass();
+        while (currentClass != null && getDataFolderMethod == null) {
+            try {
+                getDataFolderMethod = currentClass.getDeclaredMethod("getDataFolder");
+                if (!Modifier.isPublic(getDataFolderMethod.getModifiers())) {
+                    throw new IOException("getDataFolder() method must be public");
+                }
+            } catch (NoSuchMethodException e) {
+                currentClass = currentClass.getSuperclass();
+            }
+        }
+
+        if (getDataFolderMethod == null) {
+            throw new NoSuchMethodException("getDataFolder() method not found in class hierarchy");
+        }
+
+        return getDataFolderMethod;
+    }
+
+    // ==================== Utility Methods ====================
+
+    @Contract(pure = true)
+    private static boolean isLenient(@NotNull Leniency leniency, boolean isLenientByDefault) {
+        switch (leniency) {
+            case LENIENT:
+                return true;
+            case UNDEFINED:
+                return isLenientByDefault;
+            default:
+                return false;
         }
     }
 }

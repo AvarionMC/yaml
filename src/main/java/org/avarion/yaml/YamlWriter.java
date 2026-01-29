@@ -84,6 +84,20 @@ class YamlWriter {
      */
     private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) throws IOException {
         List<?> items = normalizeCollection(collection);
+
+        // Handle empty collections: write [] inline (not as a quoted string)
+        if (items.isEmpty()) {
+            // Remove trailing newline if present, add space and []
+            if (yaml.charAt(yaml.length() - 1) == '\n') {
+                yaml.deleteCharAt(yaml.length() - 1);
+            }
+            if (yaml.charAt(yaml.length() - 1) != ' ') {
+                yaml.append(' ');
+            }
+            yaml.append("[]\n");
+            return;
+        }
+
         for (Object item : items) {
             if (!yaml.subSequence(yaml.length() - 2, yaml.length()).equals("- ")) {
                 yaml.append(indent);
