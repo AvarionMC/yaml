@@ -7,8 +7,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.RecordComponent;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,6 +40,11 @@ class YamlWriter {
      * This is the ONLY place where we check the type of a value.
      */
     private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) throws IOException {
+        // Handle Records: convert to Map for YAML representation
+        if (value != null && value.getClass().isRecord()) {
+            value = recordToMap(value);
+        }
+
         if (value instanceof Map) {
             writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
         }
@@ -98,6 +105,36 @@ class YamlWriter {
         }
         yaml.append(formatValue(value));
         yaml.append('\n');
+    }
+
+    /**
+     * Converts a Record to a Map by extracting all component values.
+     * Handles nested records by recursively converting them to Maps.
+     */
+    private Map<String, Object> recordToMap(@NotNull Object record) throws IOException {
+        Map<String, Object> result = new LinkedHashMap<>();
+        RecordComponent[] components = record.getClass().getRecordComponents();
+
+        for (RecordComponent component : components) {
+            String name = component.getName();
+            try {
+                Method accessor = component.getAccessor();
+                accessor.setAccessible(true);
+                Object value = accessor.invoke(record);
+
+                // Recursively convert nested records
+                if (value != null && value.getClass().isRecord()) {
+                    value = recordToMap(value);
+                }
+
+                result.put(name, value);
+            }
+            catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IOException("Failed to access record component '" + name + "': " + e.getMessage(), e);
+            }
+        }
+
+        return result;
     }
 
     /**

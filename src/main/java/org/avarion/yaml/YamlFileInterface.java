@@ -113,6 +113,11 @@ public abstract class YamlFileInterface {
             return convertToCharacter(String.valueOf(value), isLenient);
         }
 
+        // Handle Records: convert Map to Record using canonical constructor
+        if (value instanceof Map && expectedType.isRecord()) {
+            return convertMapToRecord(expectedType, (Map<?, ?>) value, isLenient);
+        }
+
         // For other classes, attempt to use their constructor that takes a String parameter
         try {
             Constructor<?> constructor = expectedType.getConstructor(String.class);
@@ -328,6 +333,64 @@ public abstract class YamlFileInterface {
 
     private static <E extends Enum<E>> @NotNull E stringToEnum(final Class<E> enumClass, final @NotNull String value) {
         return Enum.valueOf(enumClass, value.toUpperCase());
+    }
+
+    /**
+     * Converts a Map to a Record instance by matching map keys to record component names.
+     * Supports nested records: if a component is itself a record and the value is a Map,
+     * it will recursively convert the nested Map to the nested record type.
+     */
+    private static @NotNull Object convertMapToRecord(final @NotNull Class<?> recordClass, final @NotNull Map<?, ?> map, boolean isLenient)
+            throws IOException {
+        RecordComponent[] components = recordClass.getRecordComponents();
+        Object[] args = new Object[components.length];
+
+        for (int i = 0; i < components.length; i++) {
+            RecordComponent component = components[i];
+            String componentName = component.getName();
+            Class<?> componentType = component.getType();
+            Type genericType = component.getGenericType();
+
+            Object value = map.get(componentName);
+
+            if (value == null) {
+                // Handle null: primitives cannot be null
+                if (componentType.isPrimitive()) {
+                    throw new IOException("Cannot assign null to primitive record component '" + componentName +
+                            "' in record " + recordClass.getSimpleName());
+                }
+                args[i] = null;
+            }
+            else if (value instanceof Map && componentType.isRecord()) {
+                // Nested record: recursively convert
+                args[i] = convertMapToRecord(componentType, (Map<?, ?>) value, isLenient);
+            }
+            else if (value instanceof Map && Map.class.isAssignableFrom(componentType)) {
+                // Map field within record: use convertWithType for proper type handling
+                args[i] = convertWithType(genericType, value, isLenient);
+            }
+            else if (value instanceof Collection && Collection.class.isAssignableFrom(componentType)) {
+                // Collection field within record: use convertWithType for proper type handling
+                args[i] = convertWithType(genericType, value, isLenient);
+            }
+            else {
+                // Regular field: use getConvertedValue for type coercion
+                args[i] = getConvertedValue(null, componentType, value, isLenient);
+            }
+        }
+
+        try {
+            // Get the canonical constructor (matches all record components in order)
+            Class<?>[] paramTypes = Arrays.stream(components)
+                                          .map(RecordComponent::getType)
+                                          .toArray(Class<?>[]::new);
+            Constructor<?> constructor = recordClass.getDeclaredConstructor(paramTypes);
+            constructor.setAccessible(true);
+            return constructor.newInstance(args);
+        }
+        catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            throw new IOException("Failed to instantiate record " + recordClass.getSimpleName() + ": " + e.getMessage(), e);
+        }
     }
 
     /**
