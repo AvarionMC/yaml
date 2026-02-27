@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class YamlWriter {
-    private static final Pattern GENERIC_TOSTRING_PATTERN = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_]*)@([a-f0-9]+)");
+    private static final Pattern GENERIC_TOSTRING_PATTERN = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_$]*)@([a-f0-9]+)");
 
     private final YamlWrapper yamlWrapper;
 
@@ -46,6 +46,9 @@ class YamlWriter {
         }
         else if (value instanceof Collection) {
             writeCollection(yaml, (Collection<?>) value, indent);
+        }
+        else if (value instanceof YamlSerializable) {
+            writeMap(yaml, ((YamlSerializable) value).toYamlMap(), firstIndent, indent);
         }
         else {
             writeScalar(yaml, value);
