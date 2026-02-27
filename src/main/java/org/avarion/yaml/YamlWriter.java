@@ -2,17 +2,15 @@ package org.avarion.yaml;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Responsible for converting nested Java objects to YAML format.
@@ -38,6 +36,11 @@ class YamlWriter {
      * This is the ONLY place where we check the type of a value.
      */
     private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) throws IOException {
+        // Handle Records: convert to Map for YAML representation
+        if (value != null && value.getClass().isRecord()) {
+            value = recordToMap(value);
+        }
+
         if (value instanceof Map) {
             writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
         }
@@ -59,8 +62,7 @@ class YamlWriter {
             Object value = entry.getValue();
 
             // Handle comments from NestedNode
-            if (value instanceof NestedMap.NestedNode) {
-                NestedMap.NestedNode node = (NestedMap.NestedNode) value;
+            if (value instanceof NestedMap.NestedNode node) {
                 appendComment(yaml, node.comment, indent);
                 value = node.value;
             }
@@ -77,6 +79,20 @@ class YamlWriter {
      */
     private void writeCollection(StringBuilder yaml, Collection<?> collection, String indent) throws IOException {
         List<?> items = normalizeCollection(collection);
+
+        // Handle empty collections: write [] inline (not as a quoted string)
+        if (items.isEmpty()) {
+            // Remove trailing newline if present, add space and []
+            if (yaml.charAt(yaml.length() - 1) == '\n') {
+                yaml.deleteCharAt(yaml.length() - 1);
+            }
+            if (yaml.charAt(yaml.length() - 1) != ' ') {
+                yaml.append(' ');
+            }
+            yaml.append("[]\n");
+            return;
+        }
+
         for (Object item : items) {
             if (!yaml.subSequence(yaml.length() - 2, yaml.length()).equals("- ")) {
                 yaml.append(indent);
@@ -101,13 +117,44 @@ class YamlWriter {
     }
 
     /**
+     * Converts a Record to a Map by extracting all component values.
+     * Handles nested records by recursively converting them to Maps.
+     */
+    private Map<String, Object> recordToMap(@NotNull Object potentialRecord) throws IOException {
+        Map<String, Object> result = new LinkedHashMap<>();
+        RecordComponent[] components = potentialRecord.getClass().getRecordComponents();
+
+        for (RecordComponent component : components) {
+            String name = component.getName();
+            try {
+                Method accessor = component.getAccessor();
+                accessor.setAccessible(true);
+                Object value = accessor.invoke(potentialRecord);
+
+                // Recursively convert nested records
+                if (value != null && value.getClass().isRecord()) {
+                    value = recordToMap(value);
+                }
+
+                result.put(name, value);
+            }
+            catch (IllegalAccessException | InvocationTargetException e) {
+                throw new IOException("Failed to access record component '" + name + "': " + e.getMessage(), e);
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Primitive building block: Normalize a collection to a sorted list
      * Converts Sets to Lists, sorting if elements are Comparable
      */
-    private List<?> normalizeCollection(@NotNull Collection<?> collection) {
+    @Contract("_ -> new")
+    private @NotNull List<?> normalizeCollection(@NotNull Collection<?> collection) {
         if (!collection.isEmpty() && collection instanceof Set && collection.iterator().next() instanceof Comparable) {
             // Only re-order sets if their elements can be compared
-            return collection.stream().sorted().collect(Collectors.toList());
+            collection = collection.stream().sorted().toList();
         }
 
         return new ArrayList<>(collection);
@@ -122,15 +169,14 @@ class YamlWriter {
         }
 
         // Check if it's a Bukkit Keyed object (via reflection to avoid hard dependency)
-        // Check if value implements Keyed interface
         Class<?> keyedInterface = null;
         try {
             keyedInterface = Class.forName("org.bukkit.Keyed");
-        } catch (ClassNotFoundException e) {
-            throw new IOException(e);
+        } catch (ClassNotFoundException ignored) {
+            // Bukkit not on classpath, skip Keyed handling
         }
 
-        if (keyedInterface.isInstance(value)) {
+        if (keyedInterface != null && keyedInterface.isInstance(value)) {
             try {
                 // Call key() to get NamespacedKey
                 Method getKeyMethod = value.getClass().getMethod("key");
@@ -171,24 +217,21 @@ class YamlWriter {
      * Helper: Find the name of a public static field that holds this value
      */
     private static Optional<String> getStaticFieldName(@Nullable Object value) {
-        try {
-            Class<?> clazz = value.getClass();
-
-            return Arrays.stream(clazz.getDeclaredFields())
-                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                         .filter(field -> {
-                             try {
-                                 field.setAccessible(true);
-                                 return field.get(null)==value;
-                             } catch (IllegalAccessException e) {
-                                 return false;
-                             }
-                         })
-                         .map(Field::getName)
-                         .findFirst();
-        } catch (Exception e) {
+        if (value == null) {
             return Optional.empty();
         }
+
+        return Arrays.stream(value.getClass().getDeclaredFields())
+                     .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
+                     .filter(field -> {
+                         try {
+                             return field.get(null) == value;
+                         } catch (IllegalAccessException e) {
+                             return false;
+                         }
+                     })
+                     .map(Field::getName)
+                     .findFirst();
     }
 
     /**
