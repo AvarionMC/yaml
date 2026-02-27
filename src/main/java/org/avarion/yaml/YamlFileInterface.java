@@ -372,11 +372,7 @@ public abstract class YamlFileInterface {
             return new File(dataFolder, filename);
         } catch (NoSuchMethodException e) {
             throw new IOException("Plugin does not have a getDataFolder() method with no parameters", e);
-        } catch (IllegalAccessException e) {
-            throw new IOException("getDataFolder() method must be public", e);
-        } catch (InvocationTargetException e) {
-            throw new IOException(e.getMessage(), e);
-        } catch (ClassCastException e) {
+        } catch (InvocationTargetException | IllegalAccessException | ClassCastException e) {
             throw new IOException(e.getMessage(), e);
         }
     }

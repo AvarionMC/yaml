@@ -1,6 +1,9 @@
 package org.avarion.yaml;
 
 import org.avarion.yaml.testClasses.BossConfig;
+import org.avarion.yaml.testClasses.ThrowingRecord;
+import org.bukkit.BrokenSound;
+import org.bukkit.Sound;
 import org.junit.jupiter.api.Test;
 
 import java.io.FileWriter;
@@ -424,5 +427,105 @@ class CoverageBoostTests extends TestCommon {
         RecordConfig loaded = new RecordConfig().load(target);
         assertNotNull(loaded.rec);
         assertEquals("Test", loaded.rec.name());
+    }
+
+    // ==================== YamlWriter: nested empty collection covers L86/L89 partials ====================
+
+    @Test
+    void testNestedEmptyCollectionInList() throws IOException {
+        // When an empty list is nested inside another list, the StringBuilder
+        // ends with "- " (not '\n'), covering the false branches at L86/L89
+        class NestedListConfig extends YamlFileInterface {
+            @YamlKey("items")
+            public List<List<String>> items = List.of(new ArrayList<>(), List.of("a"));
+        }
+
+        NestedListConfig config = new NestedListConfig();
+        config.save(target);
+
+        String content = readFile();
+        assertTrue(content.contains("[]"));
+        assertTrue(content.contains("a"));
+    }
+
+    // ==================== YamlWriter: record with throwing accessor (L141-142) ====================
+
+    @Test
+    void testRecordWithThrowingAccessor() {
+        class ThrowingRecordConfig extends YamlFileInterface {
+            @YamlKey("record")
+            public ThrowingRecord rec = new ThrowingRecord("test");
+        }
+
+        ThrowingRecordConfig config = new ThrowingRecordConfig();
+        IOException thrown = assertThrows(IOException.class, () -> config.save(target));
+        assertTrue(thrown.getMessage().contains("Failed to access record component"));
+    }
+
+    // ==================== YamlWriter: broken Keyed object (L192-194) ====================
+
+    @Test
+    void testBrokenKeyedObjectThrows() {
+        class BrokenSoundConfig extends YamlFileInterface {
+            @YamlKey("sound")
+            public Sound sound = new BrokenSound();
+        }
+
+        BrokenSoundConfig config = new BrokenSoundConfig();
+        IOException thrown = assertThrows(IOException.class, () -> config.save(target));
+        assertTrue(thrown.getMessage().contains("Failed to get key from Keyed object"));
+    }
+
+    // ==================== YamlFileInterface: @YamlMap with whitespace-only value (L194/L277 partials) ====================
+
+    @Test
+    void testYamlMapWithWhitespaceOnlyValue() throws IOException {
+        class WhitespaceMapConfig extends YamlFileInterface {
+            @YamlKey("name")
+            public String name = "test";
+
+            @YamlMap(value = " ", processor = WhitespaceMapConfig.Processor.class)
+            public Map<String, Object> ignored = new HashMap<>();
+
+            static class Processor implements YamlMap.YamlMapProcessor<WhitespaceMapConfig> {
+                @Override
+                public void read(WhitespaceMapConfig obj, String key, Map<String, Object> value) {
+                    // Intentionally empty: tests that this is never called
+                }
+
+                @Override
+                public Map<String, Object> write(WhitespaceMapConfig obj, String key, Object value) {
+                    return Map.of();
+                }
+            }
+        }
+
+        // The @YamlMap with whitespace value should be skipped during both save and load
+        WhitespaceMapConfig config = new WhitespaceMapConfig();
+        config.save(target);
+
+        String content = readFile();
+        assertTrue(content.contains("name: test"));
+
+        WhitespaceMapConfig loaded = new WhitespaceMapConfig().load(target);
+        assertEquals("test", loaded.name);
+    }
+
+    // ==================== Raw Map field without generics (TypeConverter L206) ====================
+
+    @Test
+    void testRawMapFieldWithoutGenerics() throws IOException {
+        class RawMapConfig extends YamlFileInterface {
+            @SuppressWarnings("rawtypes")
+            @YamlKey("data")
+            public Map data = new LinkedHashMap<>(Map.of("key", "value"));
+        }
+
+        RawMapConfig config = new RawMapConfig();
+        config.save(target);
+
+        RawMapConfig loaded = new RawMapConfig().load(target);
+        assertNotNull(loaded.data);
+        assertEquals("value", loaded.data.get("key"));
     }
 }

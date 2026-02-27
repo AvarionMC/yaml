@@ -2,6 +2,7 @@ package org.avarion.yaml;
 
 import org.avarion.yaml.testClasses.Address;
 import org.avarion.yaml.testClasses.Material;
+import org.avarion.yaml.testClasses.ValidatingRecord;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -511,5 +512,54 @@ class TypeConverterDirectTest {
 
         Object result = TypeConverter.convertWithType(singleArgMapType, mapValue, false);
         assertInstanceOf(Map.class, result);
+    }
+
+    // ==================== Record constructor failure (L286-287) ====================
+
+    @Test
+    void testRecordConstructorThrowsCausesIOException() {
+        // ValidatingRecord throws IllegalArgumentException for negative values
+        Map<String, Object> recordMap = new LinkedHashMap<>();
+        recordMap.put("name", "Test");
+        recordMap.put("value", -1);
+
+        IOException thrown = assertThrows(IOException.class, () ->
+                TypeConverter.getConvertedValue(null, ValidatingRecord.class, recordMap, false));
+        assertTrue(thrown.getMessage().contains("Failed to instantiate record ValidatingRecord"));
+    }
+
+    // ==================== Record component with Map value but non-Map type (L263 partial) ====================
+
+    @Test
+    void testRecordComponentGetsMapValueButExpectsString() throws IOException {
+        // Address has String street, String city, int zipCode
+        // Provide a Map where a String is expected → falls through else-if chain to else block
+        Map<String, Object> recordMap = new LinkedHashMap<>();
+        recordMap.put("street", Map.of("nested", "value")); // Map for a String component
+        recordMap.put("city", "Springfield");
+        recordMap.put("zipCode", 12345);
+
+        // String has a String(String) constructor, so Map.toString() will be used
+        Object result = TypeConverter.getConvertedValue(null, Address.class, recordMap, false);
+        assertInstanceOf(Address.class, result);
+        // The map's toString becomes the street value
+        Address addr = (Address) result;
+        assertNotNull(addr.street());
+    }
+
+    // ==================== Record component with Collection value but non-Collection type (L267 partial) ====================
+
+    @Test
+    void testRecordComponentGetsListValueButExpectsString() {
+        // List value for a String component: L267 else-if evaluates to false
+        // (value IS Collection but componentType String is NOT Collection-assignable)
+        Map<String, Object> recordMap = new LinkedHashMap<>();
+        recordMap.put("street", List.of("a", "b")); // List for a String component
+        recordMap.put("city", "Springfield");
+        recordMap.put("zipCode", 12345);
+
+        // Falls through to else block, then getConvertedValue tries to create String collection → fails
+        assertThrows(IOException.class, () ->
+                TypeConverter.getConvertedValue(null, Address.class, recordMap, false));
     }
 }

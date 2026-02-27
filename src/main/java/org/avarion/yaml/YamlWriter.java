@@ -169,15 +169,14 @@ class YamlWriter {
         }
 
         // Check if it's a Bukkit Keyed object (via reflection to avoid hard dependency)
-        // Check if value implements Keyed interface
         Class<?> keyedInterface = null;
         try {
             keyedInterface = Class.forName("org.bukkit.Keyed");
-        } catch (ClassNotFoundException e) {
-            throw new IOException(e);
+        } catch (ClassNotFoundException ignored) {
+            // Bukkit not on classpath, skip Keyed handling
         }
 
-        if (keyedInterface.isInstance(value)) {
+        if (keyedInterface != null && keyedInterface.isInstance(value)) {
             try {
                 // Call key() to get NamespacedKey
                 Method getKeyMethod = value.getClass().getMethod("key");
@@ -218,24 +217,21 @@ class YamlWriter {
      * Helper: Find the name of a public static field that holds this value
      */
     private static Optional<String> getStaticFieldName(@Nullable Object value) {
-        try {
-            Class<?> clazz = value.getClass();
-
-            return Arrays.stream(clazz.getDeclaredFields())
-                         .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                         .filter(field -> {
-                             try {
-                                 field.setAccessible(true);
-                                 return field.get(null)==value;
-                             } catch (IllegalAccessException e) {
-                                 return false;
-                             }
-                         })
-                         .map(Field::getName)
-                         .findFirst();
-        } catch (Exception e) {
+        if (value == null) {
             return Optional.empty();
         }
+
+        return Arrays.stream(value.getClass().getDeclaredFields())
+                     .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
+                     .filter(field -> {
+                         try {
+                             return field.get(null) == value;
+                         } catch (IllegalAccessException e) {
+                             return false;
+                         }
+                     })
+                     .map(Field::getName)
+                     .findFirst();
     }
 
     /**
