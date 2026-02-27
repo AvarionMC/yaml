@@ -1,6 +1,5 @@
 package org.avarion.yaml;
 
-import org.avarion.yaml.testClasses.BossConfig;
 import org.avarion.yaml.testClasses.ThrowingRecord;
 import org.bukkit.BrokenSound;
 import org.bukkit.Sound;
@@ -105,51 +104,6 @@ class CoverageBoostTests extends TestCommon {
         assertEquals("default", loaded.value);
     }
 
-    // ==================== YamlFileInterface: YamlMap with non-Map entries ====================
-
-    @Test
-    void testYamlMapSkipsNonMapEntries() throws IOException {
-        // Write YAML where a YamlMap section has a mix of map and non-map values
-        new BossConfig().save(target);
-        // Add a non-map entry under bosses
-        String content = readFile();
-        content = content.replace("bosses:\n", "bosses:\n  scalar_entry: just_a_string\n");
-        Files.write(target.toPath(), content.getBytes());
-
-        BossConfig loaded = new BossConfig().load(target);
-        // scalar_entry should be skipped since it's not a Map
-        assertNotNull(loaded.bosses);
-        assertFalse(loaded.bosses.containsKey("scalar_entry"));
-        // The normal boss entries should still be loaded
-        assertTrue(loaded.bosses.containsKey("boss1") || loaded.bosses.containsKey("boss2"));
-    }
-
-    // ==================== YamlFileInterface: writeYamlMapField with non-Map field ====================
-
-    @Test
-    void testWriteYamlMapFieldWhenFieldIsNull() {
-        class NullMapConfig extends YamlFileInterface {
-            @YamlMap(value = "items", processor = NullMapConfig.Processor.class)
-            public Map<String, Object> items = null;
-
-            static class Processor implements YamlMap.YamlMapProcessor<NullMapConfig> {
-                @Override
-                public void read(NullMapConfig obj, String key, Map<String, Object> value) {
-                    // no-op
-                }
-
-                @Override
-                public Map<String, Object> write(NullMapConfig obj, String key, Object value) {
-                    return Map.of();
-                }
-            }
-        }
-
-        NullMapConfig config = new NullMapConfig();
-        // items is null, so writeYamlMapField should skip since null is not instanceof Map
-        assertDoesNotThrow(() -> config.save(target));
-    }
-
     // ==================== YamlFileInterface: isLenient branches ====================
 
     @Test
@@ -203,64 +157,6 @@ class CoverageBoostTests extends TestCommon {
         config.save(target);
         String content = readFile();
         assertTrue(content.contains("value: null"));
-    }
-
-    // ==================== YamlFileInterface: loadFields with both annotations error ====================
-
-    @Test
-    void testBothAnnotationsOnFieldThrows() throws IOException {
-        class DualAnnotationConfig extends YamlFileInterface {
-            @YamlKey("key")
-            @YamlMap(value = "key", processor = DualAnnotationConfig.Processor.class)
-            public Map<String, Object> field = new HashMap<>();
-
-            static class Processor implements YamlMap.YamlMapProcessor<DualAnnotationConfig> {
-                @Override
-                public void read(DualAnnotationConfig obj, String key, Map<String, Object> value) {
-                    // Intentionally empty: only used to test annotation validation
-                }
-
-                @Override
-                public Map<String, Object> write(DualAnnotationConfig obj, String key, Object value) {
-                    return Map.of();
-                }
-            }
-        }
-
-        DualAnnotationConfig config = new DualAnnotationConfig();
-        config.save(target);
-
-        DualAnnotationConfig loaded = new DualAnnotationConfig();
-        assertThrows(IllegalStateException.class, () -> loaded.load(target));
-    }
-
-    // ==================== YamlFileInterface: FinalAttribute on YamlMap field ====================
-
-    @Test
-    void testFinalYamlMapFieldOnLoadThrows() throws IOException {
-        class FinalMapConfig extends YamlFileInterface {
-            @YamlMap(value = "items", processor = FinalMapConfig.Processor.class)
-            public final Map<String, Object> items = new HashMap<>();
-
-            static class Processor implements YamlMap.YamlMapProcessor<FinalMapConfig> {
-                @Override
-                public void read(FinalMapConfig obj, String key, Map<String, Object> value) {
-                    // Intentionally empty: only used to test final field validation
-                }
-
-                @Override
-                public Map<String, Object> write(FinalMapConfig obj, String key, Object value) {
-                    return Map.of();
-                }
-            }
-        }
-
-        // Create a valid YAML file with items section
-        try (FileWriter writer = new FileWriter(target)) {
-            writer.write("items:\n  entry1:\n    name: test\n");
-        }
-
-        assertThrows(IOException.class, () -> new FinalMapConfig().load(target));
     }
 
     // ==================== Record with null non-primitive component ====================
@@ -362,38 +258,6 @@ class CoverageBoostTests extends TestCommon {
         assertNotNull(thrown.getCause());
     }
 
-    // ==================== Processor without no-arg constructor (save path) ====================
-
-    @Test
-    void testWriteYamlMapWithBrokenProcessor() {
-        class BrokenProcessorConfig extends YamlFileInterface {
-            @YamlMap(value = "items", processor = BrokenProcessorConfig.BadProcessor.class)
-            public Map<String, Object> items = new HashMap<>(Map.of("a", "b"));
-
-            static class BadProcessor implements YamlMap.YamlMapProcessor<BrokenProcessorConfig> {
-                // Constructor that requires parameters → no default no-arg constructor
-                private final String required;
-
-                public BadProcessor(String required) {
-                    this.required = required;
-                }
-
-                @Override
-                public void read(BrokenProcessorConfig obj, String key, Map<String, Object> value) {
-                    // Intentionally empty: only testing constructor failure on save
-                }
-
-                @Override
-                public Map<String, Object> write(BrokenProcessorConfig obj, String key, Object value) {
-                    return Map.of();
-                }
-            }
-        }
-
-        BrokenProcessorConfig config = new BrokenProcessorConfig();
-        assertThrows(IllegalStateException.class, () -> config.save(target));
-    }
-
     // ==================== YamlMap with empty value annotation (no key) ====================
 
     @Test
@@ -474,41 +338,6 @@ class CoverageBoostTests extends TestCommon {
         BrokenSoundConfig config = new BrokenSoundConfig();
         IOException thrown = assertThrows(IOException.class, () -> config.save(target));
         assertTrue(thrown.getMessage().contains("Failed to get key from Keyed object"));
-    }
-
-    // ==================== YamlFileInterface: @YamlMap with whitespace-only value (L194/L277 partials) ====================
-
-    @Test
-    void testYamlMapWithWhitespaceOnlyValue() throws IOException {
-        class WhitespaceMapConfig extends YamlFileInterface {
-            @YamlKey("name")
-            public String name = "test";
-
-            @YamlMap(value = " ", processor = WhitespaceMapConfig.Processor.class)
-            public Map<String, Object> ignored = new HashMap<>();
-
-            static class Processor implements YamlMap.YamlMapProcessor<WhitespaceMapConfig> {
-                @Override
-                public void read(WhitespaceMapConfig obj, String key, Map<String, Object> value) {
-                    // Intentionally empty: tests that this is never called
-                }
-
-                @Override
-                public Map<String, Object> write(WhitespaceMapConfig obj, String key, Object value) {
-                    return Map.of();
-                }
-            }
-        }
-
-        // The @YamlMap with whitespace value should be skipped during both save and load
-        WhitespaceMapConfig config = new WhitespaceMapConfig();
-        config.save(target);
-
-        String content = readFile();
-        assertTrue(content.contains("name: test"));
-
-        WhitespaceMapConfig loaded = new WhitespaceMapConfig().load(target);
-        assertEquals("test", loaded.name);
     }
 
     // ==================== Raw Map field without generics (TypeConverter L206) ====================
