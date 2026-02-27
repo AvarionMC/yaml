@@ -301,15 +301,13 @@ server:
     - https://myapp.com
 ```
 
-## Records vs @YamlMap
+## When to Use Records
 
-| Feature       | Records               | @YamlMap                 |
-|---------------|-----------------------|--------------------------|
-| Syntax        | Clean, declarative    | Verbose, imperative      |
-| Immutability  | Immutable by design   | Mutable                  |
-| Boilerplate   | Minimal               | Requires processor class |
-| Complex logic | Limited               | Full control             |
-| Validation    | Constructor only      | Custom in processor      |
-| Best for      | Data transfer objects | Complex transformations  |
+Records are the recommended approach for structured data in YAML configuration:
 
-**Recommendation:** Use Records for most cases. Use `@YamlMap` only when you need custom serialization logic.
+- **Data transfer objects** - Clean, immutable value types
+- **Nested structures** - Records can contain other records
+- **Collections** - Use `List<RecordType>` or `Map<K, RecordType>`
+- **Validation** - Add logic in the record's compact constructor
+
+For complex objects that can't be expressed as records, use a class with a `String` constructor (see [Advanced Usage](advanced.md#custom-type-conversion)).

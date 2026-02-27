@@ -14,7 +14,7 @@ All Java primitives and their wrapper classes are supported:
 | `long`    | `Long`      | `value: 9223372036854775807` |
 | `float`   | `Float`     | `value: 3.14`                |
 | `double`  | `Double`    | `value: 3.141592653589793`   |
-| `boolean` | `Boolean`   | `value: true`                |
+| `boolean` | `Boolean`   | `value: true` (also: `yes`, `y`, `1`) |
 | `char`    | `Character` | `value: A`                   |
 
 ```java

@@ -10,7 +10,7 @@ Class-level annotation for configuring the YAML file behavior.
 @YamlFile(
     header = "Configuration file header",
     fileName = "config.yml",
-    lenient = Leniency.STRICT
+    lenient = Leniency.LENIENT
 )
 public class MyConfig extends YamlFileInterface {
     // ...
@@ -23,7 +23,7 @@ public class MyConfig extends YamlFileInterface {
 |------------|------------|----------------|--------------------------------------------------------------|
 | `header`   | `String`   | `""`           | Comment text that appears at the top of the YAML file        |
 | `fileName` | `String`   | `"config.yml"` | Default filename when using `load(plugin)` or `save(plugin)` |
-| `lenient`  | `Leniency` | `STRICT`       | Default leniency mode for all fields                         |
+| `lenient`  | `Leniency` | `LENIENT`      | Default leniency mode for all fields                         |
 
 ### Example with Header
 
@@ -174,104 +174,11 @@ public class Config extends YamlFileInterface {
 
 ---
 
-## @YamlMap
-
-Field-level annotation for custom map processing. Use this when you need complete control over how complex objects are serialized/deserialized.
-
-```java
-@YamlMap(value = "yaml-key", processor = MyProcessor.class)
-public Map<String, MyObject> myMap = new HashMap<>();
-```
-
-### Attributes
-
-| Attribute   | Type       | Default    | Description                             |
-|-------------|------------|------------|-----------------------------------------|
-| `value`     | `String`   | *required* | The YAML key path for the map           |
-| `processor` | `Class<?>` | *required* | A class implementing `YamlMapProcessor` |
-
-### Creating a Processor
-
-```java
-public class PlayerProcessor implements YamlMap.YamlMapProcessor<GameConfig> {
-
-    @Override
-    public void read(GameConfig config, String key, Map<String, Object> value) {
-        // Called for each entry when loading from YAML
-        String name = (String) value.get("name");
-        int score = (Integer) value.get("score");
-        config.players.put(key, new Player(name, score));
-    }
-
-    @Override
-    public Map<String, Object> write(GameConfig config, String key, Object value) {
-        // Called for each entry when saving to YAML
-        Player player = (Player) value;
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("name", player.getName());
-        map.put("score", player.getScore());
-        return map;
-    }
-}
-```
-
-### Complete Example
-
-```java
-public class Player {
-    private final String name;
-    private final int score;
-
-    public Player(String name, int score) {
-        this.name = name;
-        this.score = score;
-    }
-
-    public String getName() { return name; }
-    public int getScore() { return score; }
-}
-
-public class GameConfig extends YamlFileInterface {
-
-    @YamlMap(value = "players", processor = PlayerProcessor.class)
-    public Map<String, Player> players = new LinkedHashMap<>();
-
-    public GameConfig() {
-        players.put("alice", new Player("Alice", 1000));
-        players.put("bob", new Player("Bob", 850));
-    }
-}
-```
-
-YAML output:
-
-```yaml
-players:
-  alice:
-    name: Alice
-    score: 1000
-  bob:
-    name: Bob
-    score: 850
-```
-
-### When to Use @YamlMap vs Records
-
-| Use Case                        | Recommendation                                    |
-|---------------------------------|---------------------------------------------------|
-| Simple data structures          | Use [Records](records.md) - cleaner and automatic |
-| Complex transformation logic    | Use `@YamlMap` with custom processor              |
-| Legacy classes you can't modify | Use `@YamlMap` with custom processor              |
-| Need validation during load     | Use `@YamlMap` with custom processor              |
-
----
-
 ## Annotation Restrictions
 
 ### Field Requirements
 
-- Fields with `@YamlKey` or `@YamlMap` **cannot be `final`**
-- A field cannot have both `@YamlKey` and `@YamlMap` annotations
+- Fields with `@YamlKey` **cannot be `final`**
 
 ### Valid vs Invalid
 
@@ -283,9 +190,4 @@ public int setting = 0;
 // ✗ Invalid - final field
 @YamlKey("constant")
 public final int constant = 42;  // Throws FinalAttribute exception
-
-// ✗ Invalid - both annotations
-@YamlKey("data")
-@YamlMap(value = "data", processor = MyProcessor.class)
-public Map<String, Object> data;  // Throws IllegalStateException
 ```

@@ -12,7 +12,7 @@ Leniency controls how strictly type conversions are enforced during YAML loading
 |-------------|---------------------------------------------------------------|
 | `STRICT`    | Exact type matching required; throws exceptions on mismatches |
 | `LENIENT`   | Attempts automatic type coercion when possible                |
-| `UNDEFINED` | Inherits from parent (`@YamlFile` or defaults to `STRICT`)    |
+| `UNDEFINED` | Field-level only: inherits from `@YamlFile`; defaults to `LENIENT` when `@YamlFile` is absent |
 
 ### Setting Leniency
 
@@ -140,7 +140,9 @@ The library will:
 
 ## Inheritance
 
-Configuration classes can extend other configuration classes:
+Configuration classes can extend other configuration classes.
+
+**Important:** Loading traverses the full class hierarchy, but saving only writes fields declared in the concrete class. Fields inherited from a parent class are not written on save.
 
 ```java
 public abstract class BaseConfig extends YamlFileInterface {
@@ -160,13 +162,15 @@ public class PluginConfig extends BaseConfig {
 }
 ```
 
+Saving `new PluginConfig()` writes only the fields declared in `PluginConfig`:
+
 ```yaml
-version: 1
-debug: false
 plugin:
   name: MyPlugin
   enabled: true
 ```
+
+Loading will populate `version` and `debug` from the YAML file if those keys are present (since load traverses all parent classes), but they will not appear in freshly saved files.
 
 ---
 
@@ -230,7 +234,6 @@ public class MyPlugin extends JavaPlugin {
 | `IOException`           | File read/write errors, type conversion failures |
 | `FinalAttribute`        | Attempting to use `@YamlKey` on a `final` field  |
 | `DuplicateKey`          | Same key path used multiple times                |
-| `IllegalStateException` | Both `@YamlKey` and `@YamlMap` on same field     |
 
 ### Handling Missing Fields
 
@@ -272,9 +275,9 @@ public Integer nullableInt = null;  // Works fine
 - `save()` writes the entire file atomically
 - For large configurations, consider splitting into multiple files
 
-### Reflection Caching
+### Reflection
 
-The library uses reflection for field access. This is cached internally, but for performance-critical applications:
+The library uses reflection for field access on every `load()` and `save()` call. For performance-critical applications:
 
 - Minimize the number of annotated fields
 - Load configuration once at startup
