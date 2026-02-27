@@ -127,7 +127,7 @@ class CoverageBoostTests extends TestCommon {
     // ==================== YamlFileInterface: writeYamlMapField with non-Map field ====================
 
     @Test
-    void testWriteYamlMapFieldWhenFieldIsNull() throws IOException {
+    void testWriteYamlMapFieldWhenFieldIsNull() {
         class NullMapConfig extends YamlFileInterface {
             @YamlMap(value = "items", processor = NullMapConfig.Processor.class)
             public Map<String, Object> items = null;

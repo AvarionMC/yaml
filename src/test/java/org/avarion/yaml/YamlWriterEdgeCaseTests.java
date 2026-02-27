@@ -185,7 +185,7 @@ class YamlWriterEdgeCaseTests extends TestCommon {
     }
 
     @Test
-    void testGetStaticFieldNameExceptionHandling() throws IOException {
+    void testGetStaticFieldNameExceptionHandling() {
         // Test with an object that might cause exceptions during serialization
         class ProblematicClass extends YamlFileInterface {
             @YamlKey("problematic")

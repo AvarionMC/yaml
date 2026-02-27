@@ -192,7 +192,7 @@ class YamlFileViaPluginTest extends TestCommon {
     }
 
     @Test
-    void testSaveWithFileSubclass() throws IOException {
+    void testSaveWithFileSubclass() {
         FileSubclass dataFolder = new FileSubclass(tempDir.toString());
         ValidPluginWithSubclass plugin = new ValidPluginWithSubclass(dataFolder);
 
