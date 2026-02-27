@@ -15,6 +15,10 @@ class TestCommon {
         return new String(Files.readAllBytes(target.toPath()));
     }
 
+    protected String readTarget() throws IOException {
+        return readFile();
+    }
+
     protected void replaceInTarget(String text, String replacement) throws IOException {
         // Read all lines from the file into a string
         Path filePath = target.toPath();

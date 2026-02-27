@@ -10,7 +10,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class FunctionalErrorTests extends TestCommon {
+class FunctionalErrorTests extends TestCommon {
     @Test
     void testWrongCollection() throws IOException {
         class Tmp extends YamlFileInterface {

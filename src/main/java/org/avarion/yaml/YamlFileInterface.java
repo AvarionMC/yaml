@@ -182,17 +182,9 @@ public abstract class YamlFileInterface {
         for (Class<?> clazz = this.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
             for (Field field : clazz.getDeclaredFields()) {
                 YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-                YamlMap mapAnnotation = field.getAnnotation(YamlMap.class);
-
-                if (keyAnnotation != null && mapAnnotation != null) {
-                    throw new IllegalStateException("Field " + field.getName() + " cannot have both @YamlKey and @YamlMap annotations");
-                }
 
                 if (keyAnnotation != null && !keyAnnotation.value().trim().isEmpty()) {
                     readYamlKeyField(data, field, keyAnnotation, isLenientByDefault);
-                }
-                else if (mapAnnotation != null && !mapAnnotation.value().trim().isEmpty()) {
-                    readYamlMapField(data, field, mapAnnotation);
                 }
             }
         }
@@ -214,35 +206,6 @@ public abstract class YamlFileInterface {
         }
     }
 
-    private void readYamlMapField(Map<String, Object> data, @NotNull Field field, @NotNull YamlMap annotation) throws IllegalAccessException, FinalAttribute {
-        if (Modifier.isFinal(field.getModifiers())) {
-            throw new FinalAttribute(field.getName());
-        }
-
-        String mapKey = annotation.value();
-        Object mapValue = getNestedValue(data, mapKey.split("\\."));
-        if (mapValue == UNKNOWN || mapValue == null) {
-            return; // Not provided: don't change the default values
-        }
-
-        try {
-            Map<String, Object> fieldMap = (Map<String, Object>) mapValue;
-
-            YamlMap.YamlMapProcessor<YamlFileInterface> processor = (YamlMap.YamlMapProcessor<YamlFileInterface>) annotation.processor()
-                                                                                                                            .getDeclaredConstructor()
-                                                                                                                            .newInstance();
-            field.set(this, new LinkedHashMap<>());
-
-            for (Map.Entry<String, Object> entry : fieldMap.entrySet()) {
-                if (entry.getValue() instanceof Map) {
-                    processor.read(this, entry.getKey(), (Map<String, Object>) entry.getValue());
-                }
-            }
-        } catch (InstantiationException | NoSuchMethodException | InvocationTargetException | ClassCastException e) {
-            throw new IllegalStateException("Failed to instantiate YamlMapProcessor", e);
-        }
-    }
-
     // ==================== YAML Building ====================
 
     private @NotNull String buildYamlContents() throws IllegalAccessException, FinalAttribute, DuplicateKey, IOException {
@@ -261,7 +224,6 @@ public abstract class YamlFileInterface {
         NestedMap nestedMap = new NestedMap();
         for (Field field : clazz.getDeclaredFields()) {
             YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-            YamlMap mapAnnotation = field.getAnnotation(YamlMap.class);
 
             if (keyAnnotation != null && !keyAnnotation.value().trim().isEmpty()) {
                 if (Modifier.isFinal(field.getModifiers())) {
@@ -274,38 +236,12 @@ public abstract class YamlFileInterface {
 
                 nestedMap.put(keyAnnotation.value(), comment == null ? null : comment.value(), value);
             }
-            else if (mapAnnotation != null && !mapAnnotation.value().trim().isEmpty()) {
-                writeYamlMapField(nestedMap, this, field, mapAnnotation);
-            }
         }
 
         // Convert the nested map to YAML using YamlWriter
         result.append(yamlWriter.write(nestedMap.getMap()));
 
         return result.toString();
-    }
-
-    private void writeYamlMapField(NestedMap nestedMap, Object obj, @NotNull Field field, @NotNull YamlMap annotation)
-            throws IllegalAccessException, DuplicateKey {
-        String mapKey = annotation.value();
-        Object fieldValue = field.get(obj);
-
-        if (fieldValue instanceof Map) {
-            try {
-                YamlMap.YamlMapProcessor<YamlFileInterface> processor = (YamlMap.YamlMapProcessor<YamlFileInterface>) annotation.processor()
-                                                                                                                                .getDeclaredConstructor()
-                                                                                                                                .newInstance();
-                Map<String, Object> processedMap = new HashMap<>();
-                for (Map.Entry<?, ?> entry : ((Map<?, ?>) fieldValue).entrySet()) {
-                    String key = entry.getKey().toString();
-                    Map<String, Object> value = processor.write((YamlFileInterface) obj, key, entry.getValue());
-                    processedMap.put(key, value);
-                }
-                nestedMap.put(mapKey, null, processedMap);
-            } catch (InstantiationException | NoSuchMethodException | InvocationTargetException e) {
-                throw new IllegalStateException("Failed to instantiate YamlMapProcessor", e);
-            }
-        }
     }
 
     private void appendHeaderComment(StringBuilder result, String header) {
