@@ -47,9 +47,6 @@ class YamlWriter {
         else if (value instanceof Collection) {
             writeCollection(yaml, (Collection<?>) value, indent);
         }
-        else if (value instanceof YamlSerializable) {
-            writeMap(yaml, ((YamlSerializable) value).toYamlMap(), firstIndent, indent);
-        }
         else {
             writeScalar(yaml, value);
         }
