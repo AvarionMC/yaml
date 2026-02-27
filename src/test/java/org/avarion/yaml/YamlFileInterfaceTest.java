@@ -264,10 +264,9 @@ class YamlFileInterfaceTest extends TestCommon {
         (new NonPrimitive()).save(target);
         replaceInTarget(": a", ": abc"); // Now it's a string
 
-        IOException thrown = assertThrows(IOException.class, () -> {
-            new NonPrimitive().load(target);
-        });
-        assertTrue(thrown.getMessage().contains("Cannot convert String of length 3 to Character"));
+        // No @YamlFile means LENIENT by default: takes first character
+        NonPrimitive loaded = new NonPrimitive().load(target);
+        assertEquals('a', (char) loaded.chr);
     }
 
     @Test
@@ -321,10 +320,9 @@ class YamlFileInterfaceTest extends TestCommon {
 
         replaceInTarget(": 1.0", ": 1.234567890123");
 
-        IOException thrown = assertThrows(IOException.class, () -> {
-            (new Primitive()).load(target.toString());
-        });
-        assertTrue(thrown.getMessage().contains("Double value 1.234567890123 cannot be precisely represented as a float"));
+        // No @YamlFile means LENIENT by default: converts with precision loss
+        Primitive loaded = (new Primitive()).load(target.toString());
+        assertEquals(1.2345679f, loaded.flt, 0.0000001f);
     }
 
     @Test

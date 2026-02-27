@@ -54,7 +54,7 @@ public abstract class YamlFileInterface {
 
         Class<?> clazz = this.getClass();
         YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
-        boolean isLenientByDefault = yamlFileAnnotation != null && yamlFileAnnotation.lenient() == Leniency.LENIENT;
+        boolean isLenientByDefault = yamlFileAnnotation == null || yamlFileAnnotation.lenient() != Leniency.STRICT;
 
         try {
             loadFields(data, isLenientByDefault);

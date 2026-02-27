@@ -10,6 +10,43 @@ import static org.junit.jupiter.api.Assertions.*;
 class LeniencyTest extends TestCommon {
 
     @Test
+    void testNoYamlFileAnnotationDefaultsToLenient() throws IOException {
+        // No @YamlFile annotation at all → should default to LENIENT
+        class TestClass extends YamlFileInterface {
+            @YamlKey("char")
+            public char chr = 'a';
+
+            @YamlKey("float")
+            public float flt = 1f;
+        }
+
+        new TestClass().save(target);
+        replaceInTarget(": a", ": bcd");
+        replaceInTarget(": 1.0", ": 0.51");
+
+        TestClass loaded = new TestClass().load(target);
+        assertEquals('b', loaded.chr);   // lenient: takes first char
+        assertEquals(0.51, loaded.flt, 0.00001);  // lenient: allows precision loss
+    }
+
+    @Test
+    void testNoYamlFileAnnotationCanBeOverriddenToStrict() throws IOException {
+        // No @YamlFile, but field-level STRICT overrides the lenient default
+        class TestClass extends YamlFileInterface {
+            @YamlKey(value = "float", lenient = Leniency.STRICT)
+            public float flt = 1f;
+        }
+
+        new TestClass().save(target);
+        replaceInTarget(": 1.0", ": 0.51");
+
+        IOException thrown = assertThrows(IOException.class, () -> {
+            new TestClass().load(target);
+        });
+        assertEquals("Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
+    }
+
+    @Test
     void testFloatNotDoubleLenient() throws IOException {
         @YamlFile(lenient = Leniency.LENIENT)
         class TestClass extends YamlFileInterface {
