@@ -54,8 +54,8 @@ final class TypeConverter {
             return value;
         }
 
-        if (expectedType.isEnum() && value instanceof String) {
-            return stringToEnum((Class<? extends Enum>) expectedType, (String) value);
+        if (expectedType.isEnum() && value instanceof String convertedValue) {
+            return stringToEnum((Class<? extends Enum>) expectedType, convertedValue);
         }
 
         if (value instanceof List<?>) {
@@ -74,8 +74,8 @@ final class TypeConverter {
             return value;
         }
 
-        if (value instanceof String && expectedType.equals(UUID.class)) {
-            return UUID.fromString((String) value);
+        if (value instanceof String convertedValue && expectedType.equals(UUID.class)) {
+            return UUID.fromString(convertedValue);
         }
 
         if (isBooleanType(expectedType)) {
@@ -129,8 +129,8 @@ final class TypeConverter {
             // Extract type arguments if this is a ParameterizedType
             Type keyType = Object.class;
             Type valueType = Object.class;
-            if (type instanceof ParameterizedType) {
-                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
+            if (type instanceof ParameterizedType convertedType) {
+                Type[] typeArgs = convertedType.getActualTypeArguments();
                 if (typeArgs.length > 0) keyType = typeArgs[0];
                 if (typeArgs.length > 1) valueType = typeArgs[1];
             }
@@ -149,8 +149,8 @@ final class TypeConverter {
 
             // Extract element type if this is a ParameterizedType
             Type elementType = Object.class;
-            if (type instanceof ParameterizedType) {
-                Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
+            if (type instanceof ParameterizedType convertedType) {
+                Type[] typeArgs = convertedType.getActualTypeArguments();
                 if (typeArgs.length > 0) elementType = typeArgs[0];
             }
 
@@ -178,8 +178,8 @@ final class TypeConverter {
 
         // Extract element type from Field's generic type if available
         Type elementType = Object.class;
-        if (field != null && field.getGenericType() instanceof ParameterizedType) {
-            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
+        if (field != null && field.getGenericType() instanceof ParameterizedType convertedType) {
+            Type[] typeArgs = convertedType.getActualTypeArguments();
             if (typeArgs.length > 0) {
                 elementType = typeArgs[0];
             }
@@ -203,8 +203,8 @@ final class TypeConverter {
         // Extract key/value types from Field's generic type if available
         Type keyType = Object.class;
         Type valueType = Object.class;
-        if (field != null && field.getGenericType() instanceof ParameterizedType) {
-            Type[] typeArgs = ((ParameterizedType) field.getGenericType()).getActualTypeArguments();
+        if (field != null && field.getGenericType() instanceof ParameterizedType convertedType) {
+            Type[] typeArgs = convertedType.getActualTypeArguments();
             if (typeArgs.length > 0) keyType = typeArgs[0];
             if (typeArgs.length > 1) valueType = typeArgs[1];
         }
@@ -306,8 +306,8 @@ final class TypeConverter {
     }
 
     private static @NotNull Boolean convertToBoolean(final Object value) {
-        if (value instanceof Boolean) {
-            return (Boolean) value;
+        if (value instanceof Boolean convertedValue) {
+            return convertedValue;
         }
 
         final String strValue = value.toString().toLowerCase().trim();
@@ -368,10 +368,10 @@ final class TypeConverter {
     static Class<?> getRawClass(Type type) {
         if (type instanceof Class<?>) {
             return (Class<?>) type;
-        } else if (type instanceof ParameterizedType) {
-            Type rawType = ((ParameterizedType) type).getRawType();
-            if (rawType instanceof Class<?>) {
-                return (Class<?>) rawType;
+        } else if (type instanceof ParameterizedType convertedType) {
+            Type rawType = convertedType.getRawType();
+            if (rawType instanceof Class<?> rawClass) {
+                return rawClass;
             }
         }
         return Object.class;

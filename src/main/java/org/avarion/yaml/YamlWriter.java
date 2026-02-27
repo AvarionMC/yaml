@@ -2,19 +2,15 @@ package org.avarion.yaml;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.RecordComponent;
+import java.lang.reflect.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Responsible for converting nested Java objects to YAML format.
@@ -66,8 +62,7 @@ class YamlWriter {
             Object value = entry.getValue();
 
             // Handle comments from NestedNode
-            if (value instanceof NestedMap.NestedNode) {
-                NestedMap.NestedNode node = (NestedMap.NestedNode) value;
+            if (value instanceof NestedMap.NestedNode node) {
                 appendComment(yaml, node.comment, indent);
                 value = node.value;
             }
@@ -125,16 +120,16 @@ class YamlWriter {
      * Converts a Record to a Map by extracting all component values.
      * Handles nested records by recursively converting them to Maps.
      */
-    private Map<String, Object> recordToMap(@NotNull Object record) throws IOException {
+    private Map<String, Object> recordToMap(@NotNull Object potentialRecord) throws IOException {
         Map<String, Object> result = new LinkedHashMap<>();
-        RecordComponent[] components = record.getClass().getRecordComponents();
+        RecordComponent[] components = potentialRecord.getClass().getRecordComponents();
 
         for (RecordComponent component : components) {
             String name = component.getName();
             try {
                 Method accessor = component.getAccessor();
                 accessor.setAccessible(true);
-                Object value = accessor.invoke(record);
+                Object value = accessor.invoke(potentialRecord);
 
                 // Recursively convert nested records
                 if (value != null && value.getClass().isRecord()) {
@@ -155,10 +150,11 @@ class YamlWriter {
      * Primitive building block: Normalize a collection to a sorted list
      * Converts Sets to Lists, sorting if elements are Comparable
      */
-    private List<?> normalizeCollection(@NotNull Collection<?> collection) {
+    @Contract("_ -> new")
+    private @NotNull List<?> normalizeCollection(@NotNull Collection<?> collection) {
         if (!collection.isEmpty() && collection instanceof Set && collection.iterator().next() instanceof Comparable) {
             // Only re-order sets if their elements can be compared
-            return collection.stream().sorted().collect(Collectors.toList());
+            collection = collection.stream().sorted().toList();
         }
 
         return new ArrayList<>(collection);
