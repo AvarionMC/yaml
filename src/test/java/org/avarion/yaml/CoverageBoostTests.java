@@ -227,7 +227,8 @@ class CoverageBoostTests extends TestCommon {
         DualAnnotationConfig config = new DualAnnotationConfig();
         config.save(target);
 
-        assertThrows(IllegalStateException.class, () -> new DualAnnotationConfig().load(target));
+        DualAnnotationConfig loaded = new DualAnnotationConfig();
+        assertThrows(IllegalStateException.class, () -> loaded.load(target));
     }
 
     // ==================== YamlFileInterface: FinalAttribute on YamlMap field ====================
