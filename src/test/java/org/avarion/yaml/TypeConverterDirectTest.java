@@ -278,9 +278,9 @@ class TypeConverterDirectTest {
 
         Object result = TypeConverter.getConvertedValue(null, RecordWithMap.class, recordMap, false);
         assertInstanceOf(RecordWithMap.class, result);
-        RecordWithMap record = (RecordWithMap) result;
-        assertEquals("Student", record.name());
-        assertEquals(Map.of("math", 90, "science", 85), record.scores());
+        RecordWithMap converted = (RecordWithMap) result;
+        assertEquals("Student", converted.name());
+        assertEquals(Map.of("math", 90, "science", 85), converted.scores());
     }
 
     @Test
@@ -294,9 +294,9 @@ class TypeConverterDirectTest {
 
         Object result = TypeConverter.getConvertedValue(null, RecordWithList.class, recordMap, false);
         assertInstanceOf(RecordWithList.class, result);
-        RecordWithList record = (RecordWithList) result;
-        assertEquals("Item", record.name());
-        assertEquals(List.of("tag1", "tag2"), record.tags());
+        RecordWithList converted = (RecordWithList) result;
+        assertEquals("Item", converted.name());
+        assertEquals(List.of("tag1", "tag2"), converted.tags());
     }
 
     // ==================== Number conversion edge cases ====================

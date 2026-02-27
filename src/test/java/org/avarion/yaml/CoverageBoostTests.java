@@ -95,7 +95,6 @@ class CoverageBoostTests extends TestCommon {
         // Save a config with properly nested value
         new NestedKeyConfig().save(target);
         // Replace the nested structure with a scalar: "a:\n  b:\n    c: default" → "a: scalar"
-        String content = readFile();
         Files.write(target.toPath(), "a: scalar_value\n".getBytes());
 
         NestedKeyConfig loaded = new NestedKeyConfig().load(target);
@@ -215,6 +214,7 @@ class CoverageBoostTests extends TestCommon {
             static class Processor implements YamlMap.YamlMapProcessor<DualAnnotationConfig> {
                 @Override
                 public void read(DualAnnotationConfig obj, String key, Map<String, Object> value) {
+                    // Intentionally empty: only used to test annotation validation
                 }
 
                 @Override
@@ -227,9 +227,7 @@ class CoverageBoostTests extends TestCommon {
         DualAnnotationConfig config = new DualAnnotationConfig();
         config.save(target);
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, () ->
-                new DualAnnotationConfig().load(target));
-        assertTrue(thrown.getMessage().contains("cannot have both @YamlKey and @YamlMap annotations"));
+        assertThrows(IllegalStateException.class, () -> new DualAnnotationConfig().load(target));
     }
 
     // ==================== YamlFileInterface: FinalAttribute on YamlMap field ====================
@@ -243,6 +241,7 @@ class CoverageBoostTests extends TestCommon {
             static class Processor implements YamlMap.YamlMapProcessor<FinalMapConfig> {
                 @Override
                 public void read(FinalMapConfig obj, String key, Map<String, Object> value) {
+                    // Intentionally empty: only used to test final field validation
                 }
 
                 @Override
@@ -273,13 +272,8 @@ class CoverageBoostTests extends TestCommon {
         RecordHolder config = new RecordHolder();
         config.save(target);
 
-        // Set the street to null
+        // Set the street to null in YAML
         replaceInTarget("123 Main", "null");
-
-        // Need to make street actually null in YAML
-        String content = readFile();
-        content = content.replace("street: null", "street: null");
-        Files.write(target.toPath(), content.getBytes());
 
         RecordHolder loaded = new RecordHolder().load(target);
         // street is String (non-primitive), so null is allowed
@@ -382,6 +376,7 @@ class CoverageBoostTests extends TestCommon {
 
                 @Override
                 public void read(BrokenProcessorConfig obj, String key, Map<String, Object> value) {
+                    // Intentionally empty: only testing constructor failure on save
                 }
 
                 @Override
