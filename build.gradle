@@ -158,9 +158,9 @@ dependencies {
     testImplementation 'org.assertj:assertj-core:3.27.7'
 
     // lombok
-    commonCompileOnly 'org.projectlombok:lombok:1.18.44'
-    commonAnnotationProcessor 'org.projectlombok:lombok:1.18.44'
-    testImplementation 'org.projectlombok:lombok:1.18.44'
+    commonCompileOnly 'org.projectlombok:lombok:1.18.46'
+    commonAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
+    testImplementation 'org.projectlombok:lombok:1.18.46'
 }
 
 jar {
