@@ -154,6 +154,32 @@ class TypeConverterDirectTest {
         assertEquals("hello", result);
     }
 
+    // ==================== Raw (non-parameterized) field handling ====================
+
+    @SuppressWarnings("rawtypes")
+    static class RawFieldFixture {
+        public List rawList;
+        public Map rawMap;
+    }
+
+    @Test
+    void testHandleCollectionValueWithRawListField() throws Exception {
+        // Raw List field (no parameterized type) — element type falls through to Object.
+        java.lang.reflect.Field rawList = RawFieldFixture.class.getField("rawList");
+        Object result = TypeConverter.getConvertedValue(rawList, List.class, List.of("a", "b"), false);
+        assertEquals(List.of("a", "b"), result);
+    }
+
+    @Test
+    void testHandleMapValueWithRawMapField() throws Exception {
+        // Raw Map field (no parameterized type) — key/value types fall through to Object.
+        java.lang.reflect.Field rawMap = RawFieldFixture.class.getField("rawMap");
+        Map<String, String> input = new LinkedHashMap<>();
+        input.put("k", "v");
+        Object result = TypeConverter.getConvertedValue(rawMap, Map.class, input, false);
+        assertEquals(input, result);
+    }
+
     // ==================== createCollectionInstance tests ====================
 
     @Test

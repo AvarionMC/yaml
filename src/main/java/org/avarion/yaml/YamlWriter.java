@@ -214,24 +214,23 @@ class YamlWriter {
     }
 
     /**
-     * Helper: Find the name of a public static field that holds this value
+     * Helper: Find the name of a public static field that holds this value.
+     * Caller (formatValue) already guarantees {@code value} is non-null.
      */
-    private static Optional<String> getStaticFieldName(@Nullable Object value) {
-        if (value == null) {
-            return Optional.empty();
+    private static Optional<String> getStaticFieldName(@NotNull Object value) {
+        for (Field field : value.getClass().getDeclaredFields()) {
+            if (!Modifier.isStatic(field.getModifiers()) || !Modifier.isPublic(field.getModifiers())) {
+                continue;
+            }
+            try {
+                if (field.get(null) == value) {
+                    return Optional.of(field.getName());
+                }
+            } catch (IllegalAccessException ignored) {
+                // public static fields are always accessible without setAccessible — defensive only
+            }
         }
-
-        return Arrays.stream(value.getClass().getDeclaredFields())
-                     .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                     .filter(field -> {
-                         try {
-                             return field.get(null) == value;
-                         } catch (IllegalAccessException e) {
-                             return false;
-                         }
-                     })
-                     .map(Field::getName)
-                     .findFirst();
+        return Optional.empty();
     }
 
     /**
