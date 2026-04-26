@@ -233,8 +233,10 @@ class YamlWriter {
      */
     private static Optional<String> getStaticFieldName(@NotNull Object value) {
         for (Field field : value.getClass().getDeclaredFields()) {
+            // canAccess(null) returns false in exactly the same scenarios get(null) would
+            // throw IllegalAccessException, preserving the original "skip the field" semantics.
             if (Modifier.isStatic(field.getModifiers())
-                    && Modifier.isPublic(field.getModifiers())
+                    && field.canAccess(null)
                     && readStatic(field) == value) {
                 return Optional.of(field.getName());
             }
@@ -242,9 +244,9 @@ class YamlWriter {
         return Optional.empty();
     }
 
-    /** Read a public static field's value. {@code @SneakyThrows} hides the unreachable IAE
-     *  (the caller already filtered for public). {@code @Generated} so JaCoCo skips the
-     *  synthetic Lombok rewrap that's structurally untestable here. */
+    /** Read a static field whose accessibility was already confirmed via {@link Field#canAccess}.
+     *  {@code @SneakyThrows} satisfies the compiler about the now-unreachable IAE; {@code @Generated}
+     *  excludes the synthetic Lombok rewrap from JaCoCo since the catch is structurally dead. */
     @Generated
     @SneakyThrows
     private static Object readStatic(@NotNull Field field) {
