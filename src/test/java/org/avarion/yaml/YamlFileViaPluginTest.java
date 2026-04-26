@@ -1,11 +1,19 @@
 package org.avarion.yaml;
 
+import org.avarion.yaml.testClasses.Material;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -108,6 +116,98 @@ class YamlFileViaPluginTest extends TestCommon {
         public File getDataFolder() {
             return null;
         }
+    }
+
+    // Plugin exposing both getDataFolder() and getLogger() — the shape Bukkit/Paper plugins have.
+    static class LoggingPlugin {
+        private final File dataFolder;
+        private final Logger logger;
+
+        public LoggingPlugin(File dataFolder, Logger logger) {
+            this.dataFolder = dataFolder;
+            this.logger = logger;
+        }
+
+        public File getDataFolder() {
+            return dataFolder;
+        }
+
+        public Logger getLogger() {
+            return logger;
+        }
+    }
+
+    @YamlFile(fileName = "config.yml", lenient = Leniency.LENIENT)
+    static class EnumListConfig extends YamlFileInterface {
+        @YamlKey("mats")
+        public List<Material> mats = List.of();
+    }
+
+    // Plugin with a getLogger() that's NOT public — must be ignored by the reflection lookup.
+    static class PrivateLoggerPlugin {
+        private final File dataFolder;
+        public PrivateLoggerPlugin(File dataFolder) { this.dataFolder = dataFolder; }
+        public File getDataFolder() { return dataFolder; }
+        @SuppressWarnings("unused")
+        private Logger getLogger() { return Logger.getLogger("private.should.be.ignored"); }
+    }
+
+    // Plugin with a public getLogger() that returns the wrong type — must be ignored.
+    static class WrongLoggerTypePlugin {
+        private final File dataFolder;
+        public WrongLoggerTypePlugin(File dataFolder) { this.dataFolder = dataFolder; }
+        public File getDataFolder() { return dataFolder; }
+        public String getLogger() { return "not a Logger"; }
+    }
+
+    @Test
+    void testLenientWarningGoesToPluginLoggerWhenLoadingViaPlugin() throws IOException {
+        File dataFolder = tempDir.toFile();
+        Files.writeString(new File(dataFolder, "config.yml").toPath(),
+                "mats:\n  - A\n  - NOT_A_MATERIAL\n  - B\n");
+
+        Logger pluginLogger = Logger.getLogger("test.plugin." + System.nanoTime());
+        pluginLogger.setUseParentHandlers(false);
+        List<LogRecord> pluginLogs = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override public void publish(LogRecord r) { pluginLogs.add(r); }
+            @Override public void flush() { /* no buffer */ }
+            @Override public void close() { /* no resources */ }
+        };
+        pluginLogger.addHandler(handler);
+
+        try {
+            LoggingPlugin plugin = new LoggingPlugin(dataFolder, pluginLogger);
+            EnumListConfig loaded = new EnumListConfig().load(plugin);
+            assertThat(loaded.mats).containsExactly(Material.A, Material.B);
+
+            // Warning routed to the plugin's logger, NOT the library default
+            assertThat(pluginLogs).hasSize(1);
+            assertThat(pluginLogs.get(0).getLevel()).isEqualTo(Level.WARNING);
+            assertThat(pluginLogs.get(0).getMessage()).contains("NOT_A_MATERIAL");
+            assertThat(logs).isEmpty();
+        } finally {
+            pluginLogger.removeHandler(handler);
+        }
+    }
+
+    @Test
+    void testNonPublicOrWrongTypeGetLoggerFallsBackToDefault() throws IOException {
+        File dataFolder = tempDir.toFile();
+        Files.writeString(new File(dataFolder, "config.yml").toPath(),
+                "mats:\n  - A\n  - NOT_A_MATERIAL\n");
+
+        // Private getLogger → reflection lookup must skip it; warning falls back to TypeConverter.LOG.
+        new EnumListConfig().load(new PrivateLoggerPlugin(dataFolder));
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0).getMessage()).contains("NOT_A_MATERIAL");
+
+        logs.clear();
+
+        // Public getLogger() with non-Logger return type must also be skipped.
+        new EnumListConfig().load(new WrongLoggerTypePlugin(dataFolder));
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0).getMessage()).contains("NOT_A_MATERIAL");
     }
 
     @Test

@@ -18,6 +18,30 @@ final class TypeConverter {
 
     static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
+    /**
+     * Per-thread override for the lenient-warning logger. Set by {@link YamlFileInterface#load(Object)}
+     * to the plugin's own logger (via reflection on {@code getLogger()}) so warnings appear in the
+     * server console under the plugin's prefix instead of {@code org.avarion.yaml.TypeConverter}.
+     */
+    private static final ThreadLocal<Logger> ACTIVE_LOG = new ThreadLocal<>();
+
+    static Logger log() {
+        Logger active = ACTIVE_LOG.get();
+        return active != null ? active : LOG;
+    }
+
+    /**
+     * Install {@code logger} as the active lenient-warning logger for the current thread,
+     * returning the previously-installed logger so the caller can restore it in a finally.
+     * Pass {@code null} to clear.
+     */
+    static @Nullable Logger pushLogger(@Nullable Logger logger) {
+        Logger prev = ACTIVE_LOG.get();
+        if (logger == null) ACTIVE_LOG.remove();
+        else ACTIVE_LOG.set(logger);
+        return prev;
+    }
+
     private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
     /**
@@ -369,7 +393,7 @@ final class TypeConverter {
             if (!isLenient) {
                 throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
             }
-            LOG.warning(() -> "Lenient mode: lossy conversion of double " + doubleValue + " to float " + (float) doubleValue);
+            log().warning(() -> "Lenient mode: lossy conversion of double " + doubleValue + " to float " + (float) doubleValue);
         }
         return numValue.floatValue();
     }
@@ -383,7 +407,7 @@ final class TypeConverter {
             return value.charAt(0);
         }
         if (isLenient) {
-            LOG.warning(() -> "Lenient mode: truncating String '" + value + "' (length " + value.length() + ") to first character");
+            log().warning(() -> "Lenient mode: truncating String '" + value + "' (length " + value.length() + ") to first character");
             return value.charAt(0);
         }
         throw new IOException("Cannot convert String of length " + value.length() + " to Character");
@@ -399,7 +423,7 @@ final class TypeConverter {
             return Enum.valueOf(enumClass, value.toUpperCase());
         } catch (IllegalArgumentException ex) {
             if (!isLenient) throw ex;
-            LOG.warning(() -> "Lenient mode: skipping unknown " + enumClass.getName() + " value '" + value + "'");
+            log().warning(() -> "Lenient mode: skipping unknown " + enumClass.getName() + " value '" + value + "'");
             return LENIENT_ENUM_SKIP;
         }
     }

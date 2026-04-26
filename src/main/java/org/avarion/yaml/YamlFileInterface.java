@@ -13,6 +13,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Abstract class providing utility methods to handle YAML files, including
@@ -105,7 +106,36 @@ public abstract class YamlFileInterface {
      * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull Object plugin) throws IOException {
-        return load(getYamlFile(plugin));
+        Logger pluginLogger = findPluginLogger(plugin);
+        Logger prev = TypeConverter.pushLogger(pluginLogger);
+        try {
+            return load(getYamlFile(plugin));
+        } finally {
+            TypeConverter.pushLogger(prev);
+        }
+    }
+
+    /**
+     * Reflectively find a public {@code getLogger()} method on the plugin (or any superclass)
+     * that returns a {@link Logger}, so lenient warnings emitted during the load surface
+     * under the plugin's own logger prefix on the server console. Returns {@code null}
+     * when no compatible method is found.
+     */
+    private static @Nullable Logger findPluginLogger(@NotNull Object plugin) {
+        Class<?> currentClass = plugin.getClass();
+        while (currentClass != null) {
+            try {
+                Method method = currentClass.getDeclaredMethod("getLogger");
+                if (Modifier.isPublic(method.getModifiers()) && Logger.class.isAssignableFrom(method.getReturnType())) {
+                    method.setAccessible(true);
+                    return (Logger) method.invoke(plugin);
+                }
+            } catch (ReflectiveOperationException ignored) {
+                // try the superclass
+            }
+            currentClass = currentClass.getSuperclass();
+        }
+        return null;
     }
 
     // ==================== Save Methods ====================

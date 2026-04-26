@@ -19,9 +19,13 @@ class TestCommon {
     /** Warnings captured from {@link TypeConverter#LOG} for the duration of each test. */
     protected final List<LogRecord> logs = new ArrayList<>();
     private final Handler logHandler = new Handler() {
-        @Override public void publish(LogRecord record) { logs.add(record); }
-        @Override public void flush() {}
-        @Override public void close() {}
+        @Override public void publish(LogRecord r) { logs.add(r); }
+        @Override public void flush() {
+            // No buffer to flush — records are appended to `logs` synchronously in publish.
+        }
+        @Override public void close() {
+            // No resources to release — the backing list outlives this handler.
+        }
     };
     private boolean originalUseParentHandlers;
 
