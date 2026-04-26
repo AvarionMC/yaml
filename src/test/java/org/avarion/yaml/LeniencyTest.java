@@ -203,10 +203,6 @@ class LeniencyTest extends TestCommon {
 
     // ==================== Lenient enum-skipping in collections/maps (issue #124) ====================
 
-    private void writeYaml(String content) throws IOException {
-        Files.writeString(target.toPath(), content);
-    }
-
     @Test
     void testLenientSkipsInvalidEnumInList() throws IOException {
         @YamlFile(lenient = Leniency.LENIENT)

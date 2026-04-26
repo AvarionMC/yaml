@@ -89,6 +89,15 @@ class YamlFileInterfaceTest extends TestCommon {
 
     @Test
     void testEnumerationsInvalidEnumItem() throws IOException {
+        @YamlFile(lenient = Leniency.STRICT)
+        class StrictListMaterial extends YamlFileInterface {
+            @YamlKey("materials")
+            public List<Material> materials = Arrays.asList(Material.A, Material.B);
+
+            @YamlKey("enum")
+            public Material material = Material.C;
+        }
+
         (new StrictListMaterial()).save(target);
         replaceInTarget("- 'B'", "- 'D'");
 
