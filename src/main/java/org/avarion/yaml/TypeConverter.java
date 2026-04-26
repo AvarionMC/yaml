@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 
 /**
  * Handles type conversion for YAML serialization/deserialization.
@@ -14,6 +15,8 @@ import java.util.function.Supplier;
  */
 @SuppressWarnings("unchecked")
 final class TypeConverter {
+
+    static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
     private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
@@ -361,8 +364,12 @@ final class TypeConverter {
 
     private static float convertToFloat(final @NotNull Number numValue, boolean isLenient) throws IOException {
         double doubleValue = numValue.doubleValue();
-        if (!isLenient && Math.abs(doubleValue - (float) doubleValue) >= 1e-9) {
-            throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
+        boolean lossy = Math.abs(doubleValue - (float) doubleValue) >= 1e-9;
+        if (lossy) {
+            if (!isLenient) {
+                throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
+            }
+            LOG.warning(() -> "Lenient mode: lossy conversion of double " + doubleValue + " to float " + (float) doubleValue);
         }
         return numValue.floatValue();
     }
@@ -372,10 +379,13 @@ final class TypeConverter {
     }
 
     private static @NotNull Character convertToCharacter(final @NotNull String value, boolean isLenient) throws IOException {
-        if (value.length() == 1 || isLenient) {
+        if (value.length() == 1) {
             return value.charAt(0);
         }
-
+        if (isLenient) {
+            LOG.warning(() -> "Lenient mode: truncating String '" + value + "' (length " + value.length() + ") to first character");
+            return value.charAt(0);
+        }
         throw new IOException("Cannot convert String of length " + value.length() + " to Character");
     }
 
@@ -389,6 +399,7 @@ final class TypeConverter {
             return Enum.valueOf(enumClass, value.toUpperCase());
         } catch (IllegalArgumentException ex) {
             if (!isLenient) throw ex;
+            LOG.warning(() -> "Lenient mode: skipping unknown " + enumClass.getName() + " value '" + value + "'");
             return LENIENT_ENUM_SKIP;
         }
     }
