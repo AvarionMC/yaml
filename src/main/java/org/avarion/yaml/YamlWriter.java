@@ -1,7 +1,9 @@
 package org.avarion.yaml;
 
 import lombok.AccessLevel;
+import lombok.Generated;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -20,7 +22,40 @@ import java.util.regex.Pattern;
 class YamlWriter {
     private static final Pattern GENERIC_TOSTRING_PATTERN = Pattern.compile("([a-zA-Z_][a-zA-Z0-9_.]*)\\.([A-Z][a-zA-Z0-9_$]*)@([a-f0-9]+)");
 
+    /** Cached at class load: the Bukkit Keyed interface if it's on the classpath, otherwise null. */
+    private static final @Nullable Class<?> KEYED_INTERFACE = loadOptional("org.bukkit.Keyed");
+
     private final YamlWrapper yamlWrapper;
+
+    /** Reflectively load a class by name, returning {@code null} when it's not on the classpath. */
+    static @Nullable Class<?> loadOptional(@NotNull String className) {
+        try {
+            return Class.forName(className);
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+    }
+
+    /**
+     * If {@code value} implements the supplied Bukkit Keyed interface, format it as
+     * {@code NAMESPACE_KEY}; otherwise return {@code null} so the caller can fall through.
+     * The {@code keyedClass} parameter is plumbed through (rather than read from the cached
+     * static) so test code can drive the {@code keyedClass == null} branch directly.
+     */
+    static @Nullable String tryFormatAsKeyed(@Nullable Class<?> keyedClass, @NotNull Object value) throws IOException {
+        if (keyedClass == null || !keyedClass.isInstance(value)) {
+            return null;
+        }
+        try {
+            Method getKeyMethod = value.getClass().getMethod("key");
+            Object namespacedKey = getKeyMethod.invoke(value);
+            Method getKeyStringMethod = namespacedKey.getClass().getMethod("value");
+            String key = (String) getKeyStringMethod.invoke(namespacedKey);
+            return key.toUpperCase(Locale.ENGLISH).replace('.', '_');
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            throw new IOException("Failed to get key from Keyed object", e);
+        }
+    }
 
     /**
      * Main entry point: converts a nested map to YAML string
@@ -168,30 +203,9 @@ class YamlWriter {
             return "null";
         }
 
-        // Check if it's a Bukkit Keyed object (via reflection to avoid hard dependency)
-        Class<?> keyedInterface = null;
-        try {
-            keyedInterface = Class.forName("org.bukkit.Keyed");
-        } catch (ClassNotFoundException ignored) {
-            // Bukkit not on classpath, skip Keyed handling
-        }
-
-        if (keyedInterface != null && keyedInterface.isInstance(value)) {
-            try {
-                // Call key() to get NamespacedKey
-                Method getKeyMethod = value.getClass().getMethod("key");
-                Object namespacedKey = getKeyMethod.invoke(value);
-
-                // Call value() on NamespacedKey to get the string key
-                Method getKeyStringMethod = namespacedKey.getClass().getMethod("value");
-                String key = (String) getKeyStringMethod.invoke(namespacedKey);
-
-                // Replace dots with underscores
-                return key.toUpperCase(Locale.ENGLISH).replace('.', '_');
-            } catch (NoSuchMethodException | IllegalAccessException | java.lang.reflect.InvocationTargetException e) {
-                // Keyed interface not available or reflection failed, continue with normal handling
-                throw new IOException("Failed to get key from Keyed object", e);
-            }
+        String keyed = tryFormatAsKeyed(KEYED_INTERFACE, value);
+        if (keyed != null) {
+            return keyed;
         }
 
         String yamlContent = yamlWrapper.dump(value).trim();
@@ -214,24 +228,29 @@ class YamlWriter {
     }
 
     /**
-     * Helper: Find the name of a public static field that holds this value
+     * Helper: Find the name of a public static field that holds this value.
+     * Caller (formatValue) already guarantees {@code value} is non-null.
      */
-    private static Optional<String> getStaticFieldName(@Nullable Object value) {
-        if (value == null) {
-            return Optional.empty();
+    private static Optional<String> getStaticFieldName(@NotNull Object value) {
+        for (Field field : value.getClass().getDeclaredFields()) {
+            // canAccess(null) returns false in exactly the same scenarios get(null) would
+            // throw IllegalAccessException, preserving the original "skip the field" semantics.
+            if (Modifier.isStatic(field.getModifiers())
+                    && field.canAccess(null)
+                    && readStatic(field) == value) {
+                return Optional.of(field.getName());
+            }
         }
+        return Optional.empty();
+    }
 
-        return Arrays.stream(value.getClass().getDeclaredFields())
-                     .filter(field -> Modifier.isStatic(field.getModifiers()) && Modifier.isPublic(field.getModifiers()))
-                     .filter(field -> {
-                         try {
-                             return field.get(null) == value;
-                         } catch (IllegalAccessException e) {
-                             return false;
-                         }
-                     })
-                     .map(Field::getName)
-                     .findFirst();
+    /** Read a static field whose accessibility was already confirmed via {@link Field#canAccess}.
+     *  {@code @SneakyThrows} satisfies the compiler about the now-unreachable IAE; {@code @Generated}
+     *  excludes the synthetic Lombok rewrap from JaCoCo since the catch is structurally dead. */
+    @Generated
+    @SneakyThrows
+    private static Object readStatic(@NotNull Field field) {
+        return field.get(null);
     }
 
     /**

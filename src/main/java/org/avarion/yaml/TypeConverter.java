@@ -211,14 +211,10 @@ final class TypeConverter {
 
         Collection<Object> result = createCollectionInstance(expectedType);
 
-        // Extract element type from Field's generic type if available
-        Type elementType = Object.class;
-        if (field != null && field.getGenericType() instanceof ParameterizedType convertedType) {
-            Type[] typeArgs = convertedType.getActualTypeArguments();
-            if (typeArgs.length > 0) {
-                elementType = typeArgs[0];
-            }
-        }
+        // Extract element type from Field's generic type if available; raw Collection / null field falls through with Object.
+        Type elementType = field != null && field.getGenericType() instanceof ParameterizedType pt
+                ? pt.getActualTypeArguments()[0]
+                : Object.class;
 
         for (Object item : collection) {
             Object convertedValue = convertWithType(elementType, item, isLenient);
@@ -234,17 +230,17 @@ final class TypeConverter {
      * Convert the incoming value into a Map with properly typed keys and values.
      */
     private static @NotNull Object handleMapValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
+            final @NotNull Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
 
         Map<Object, Object> result = new LinkedHashMap<>();
 
-        // Extract key/value types from Field's generic type if available
+        // Extract key/value types from Field's generic type if available; raw Map fields fall through with Object.
         Type keyType = Object.class;
         Type valueType = Object.class;
-        if (field != null && field.getGenericType() instanceof ParameterizedType convertedType) {
-            Type[] typeArgs = convertedType.getActualTypeArguments();
-            if (typeArgs.length > 0) keyType = typeArgs[0];
-            if (typeArgs.length > 1) valueType = typeArgs[1];
+        if (field.getGenericType() instanceof ParameterizedType pt) {
+            Type[] typeArgs = pt.getActualTypeArguments();
+            keyType = typeArgs[0];
+            valueType = typeArgs[1];
         }
 
         for (Map.Entry<?, ?> entry : map.entrySet()) {

@@ -357,4 +357,41 @@ class CoverageBoostTests extends TestCommon {
         assertNotNull(loaded.data);
         assertEquals("value", loaded.data.get("key"));
     }
+
+    // ==================== YamlWriter.loadOptional / tryFormatAsKeyed ====================
+
+    @Test
+    void testYamlWriterLoadOptionalReturnsNullForMissingClass() {
+        assertNull(YamlWriter.loadOptional("definitely.does.not.Exist"));
+    }
+
+    @Test
+    void testYamlWriterTryFormatAsKeyedReturnsNullWhenKeyedClassIsNull() throws IOException {
+        // Simulates the Bukkit-not-on-classpath case without actually removing the stubs.
+        assertNull(YamlWriter.tryFormatAsKeyed(null, "anything"));
+    }
+
+    @Test
+    void testYamlWriterTryFormatAsKeyedReturnsNullForNonKeyedValue() throws IOException {
+        // Bukkit Keyed IS on the classpath, but a String isn't an instance of it.
+        Class<?> keyed = YamlWriter.loadOptional("org.bukkit.Keyed");
+        assertNotNull(keyed);
+        assertNull(YamlWriter.tryFormatAsKeyed(keyed, "not a Keyed"));
+    }
+
+    // ==================== YamlWrapperFactory: testable failure branches ====================
+
+    @Test
+    void testYamlWrapperFactoryThrowsWhenSnakeyamlMissing() {
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> YamlWrapperFactory.create("definitely.does.not.Exist", "x", "y"));
+        assertTrue(thrown.getMessage().contains("snakeyaml not on classpath"));
+    }
+
+    @Test
+    void testYamlWrapperFactoryInstantiateThrowsForMissingImpl() {
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> YamlWrapperFactory.instantiate("definitely.does.not.Exist"));
+        assertTrue(thrown.getMessage().contains("Failed to instantiate"));
+    }
 }
