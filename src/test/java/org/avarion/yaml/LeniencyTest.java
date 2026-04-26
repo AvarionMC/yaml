@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -69,6 +70,12 @@ class LeniencyTest extends TestCommon {
         TestClass loaded = new TestClass().load(target);
         assertEquals('b', loaded.chr);
         assertEquals(0.51, loaded.flt, 0.00001);
+
+        // Lenient mode warns once for the truncated char and once for the lossy float
+        assertEquals(2, logs.size());
+        assertTrue(logs.stream().allMatch(r -> r.getLevel() == Level.WARNING));
+        assertTrue(logs.stream().anyMatch(r -> r.getMessage().contains("truncating String 'bcd'")));
+        assertTrue(logs.stream().anyMatch(r -> r.getMessage().contains("lossy conversion of double 0.51")));
     }
 
     @Test
@@ -215,6 +222,11 @@ class LeniencyTest extends TestCommon {
 
         TestClass loaded = new TestClass().load(target);
         assertEquals(List.of(Material.A, Material.B), loaded.mats);
+
+        assertEquals(1, logs.size());
+        assertEquals(Level.WARNING, logs.get(0).getLevel());
+        assertTrue(logs.get(0).getMessage().contains("NOT_A_MATERIAL"));
+        assertTrue(logs.get(0).getMessage().contains(Material.class.getName()));
     }
 
     @Test

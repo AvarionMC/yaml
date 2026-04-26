@@ -13,6 +13,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Abstract class providing utility methods to handle YAML files, including
@@ -105,7 +106,51 @@ public abstract class YamlFileInterface {
      * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull Object plugin) throws IOException {
-        return load(getYamlFile(plugin));
+        Consumer<String> prev = TypeConverter.pushSink(discoverPluginSink(plugin));
+        try {
+            return load(getYamlFile(plugin));
+        } finally {
+            TypeConverter.pushSink(prev);
+        }
+    }
+
+    /**
+     * Reflectively duck-type a warning sink onto whatever {@code plugin.getLogger()} returns:
+     * try {@code warn(String)}, {@code warning(String)}, {@code warn(String, Object[])},
+     * {@code warning(String, Object[])} in that order. Falls back to {@link TypeConverter#LOG}'s
+     * {@code warning(String)} when nothing matches, so the caller never has to null-check.
+     */
+    private static @NotNull Consumer<String> discoverPluginSink(@NotNull Object plugin) {
+        final Object logger;
+        try {
+            logger = plugin.getClass().getMethod("getLogger").invoke(plugin);
+        } catch (ReflectiveOperationException ignored) {
+            return TypeConverter.LOG::warning;
+        }
+        if (logger == null) return TypeConverter.LOG::warning;
+
+        Class<?> cls = logger.getClass();
+        for (String name : new String[] { "warn", "warning" }) {
+            try {
+                Method method = cls.getMethod(name, String.class);
+                return msg -> invokeQuietly(method, logger, msg);
+            } catch (NoSuchMethodException ignored) { /* try next */ }
+        }
+        for (String name : new String[] { "warn", "warning" }) {
+            try {
+                Method method = cls.getMethod(name, String.class, Object[].class);
+                return msg -> invokeQuietly(method, logger, msg, new Object[0]);
+            } catch (NoSuchMethodException ignored) { /* try next */ }
+        }
+        return TypeConverter.LOG::warning;
+    }
+
+    private static void invokeQuietly(@NotNull Method method, @NotNull Object target, Object... args) {
+        try {
+            method.invoke(target, args);
+        } catch (ReflectiveOperationException ignored) {
+            // Plugin's logger threw — drop the warning rather than blow up the load.
+        }
     }
 
     // ==================== Save Methods ====================
