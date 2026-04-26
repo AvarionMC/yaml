@@ -13,6 +13,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Abstract class providing utility methods to handle YAML files, including
@@ -105,8 +106,8 @@ public abstract class YamlFileInterface {
      * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull Object plugin) throws IOException {
-        TypeConverter.WarningSink sink = discoverPluginSink(plugin);
-        TypeConverter.WarningSink prev = TypeConverter.pushSink(sink);
+        Consumer<String> sink = discoverPluginSink(plugin);
+        Consumer<String> prev = TypeConverter.pushSink(sink);
         try {
             return load(getYamlFile(plugin));
         } finally {
@@ -115,45 +116,32 @@ public abstract class YamlFileInterface {
     }
 
     /**
-     * Discover a {@link TypeConverter.WarningSink} on the given plugin so lenient warnings
-     * emitted during the load reach the plugin's own logger and surface under its prefix on
-     * the server console.
-     * <p>
-     * Algorithm: reflectively call public {@code getLogger()} on the plugin; on the result
-     * (any logger flavor), look for a public method named {@code warn} or {@code warning}
-     * that takes a single {@link String}, or one that takes {@code (String, Object[])}.
-     * Returns {@code null} if no compatible method is found, in which case the lib falls
-     * back to {@link TypeConverter#LOG}.
+     * Reflectively duck-type a warning sink onto whatever {@code plugin.getLogger()} returns:
+     * try {@code warn(String)}, {@code warning(String)}, {@code warn(String, Object[])},
+     * {@code warning(String, Object[])} in that order. Returns {@code null} when nothing
+     * matches, so {@link TypeConverter} falls back to its own logger.
      */
-    private static TypeConverter.@Nullable WarningSink discoverPluginSink(@NotNull Object plugin) {
-        Object loggerObj;
+    private static @Nullable Consumer<String> discoverPluginSink(@NotNull Object plugin) {
+        Object logger;
         try {
-            loggerObj = plugin.getClass().getMethod("getLogger").invoke(plugin);
+            logger = plugin.getClass().getMethod("getLogger").invoke(plugin);
         } catch (ReflectiveOperationException ignored) {
             return null;
         }
-        return loggerObj == null ? null : adaptToSink(loggerObj);
-    }
+        if (logger == null) return null;
 
-    private static TypeConverter.@Nullable WarningSink adaptToSink(@NotNull Object logger) {
         Class<?> cls = logger.getClass();
-        // Single-String overloads cover JUL (warning) and SLF4J (warn).
         for (String name : new String[] { "warn", "warning" }) {
             try {
                 Method method = cls.getMethod(name, String.class);
                 return msg -> invokeQuietly(method, logger, msg);
-            } catch (NoSuchMethodException ignored) {
-                // try next name
-            }
+            } catch (NoSuchMethodException ignored) { /* try next */ }
         }
-        // (String, Object[]) overloads cover varargs-style loggers (Log4j2 Logger, ALogger, ...).
         for (String name : new String[] { "warn", "warning" }) {
             try {
                 Method method = cls.getMethod(name, String.class, Object[].class);
                 return msg -> invokeQuietly(method, logger, msg, new Object[0]);
-            } catch (NoSuchMethodException ignored) {
-                // try next name
-            }
+            } catch (NoSuchMethodException ignored) { /* try next */ }
         }
         return null;
     }
@@ -162,7 +150,7 @@ public abstract class YamlFileInterface {
         try {
             method.invoke(target, args);
         } catch (ReflectiveOperationException ignored) {
-            // The plugin's logger threw — drop the warning rather than blow up the load.
+            // Plugin's logger threw — drop the warning rather than blow up the load.
         }
     }
 

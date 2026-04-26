@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -18,36 +19,18 @@ final class TypeConverter {
 
     static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
-    /** Receives a single lenient-mode warning message. Duck-typed onto whatever logger the plugin exposes. */
-    @FunctionalInterface
-    interface WarningSink {
-        void warn(String message);
-    }
+    /** Per-thread sink for lenient warnings — set by {@link YamlFileInterface#load(Object)}. */
+    private static final ThreadLocal<Consumer<String>> ACTIVE = new ThreadLocal<>();
 
-    /** Default sink — the library's own JUL logger. Used when no plugin sink is active. */
-    private static final WarningSink DEFAULT_SINK = LOG::warning;
-
-    /**
-     * Per-thread override for the lenient-warning sink. Set by {@link YamlFileInterface#load(Object)}
-     * after duck-typing the plugin's {@code getLogger()} result, so warnings reach the plugin's own
-     * logger (JUL, SLF4J, ALogger, anything else with a {@code warn}/{@code warning} method) and
-     * surface under the plugin's prefix in the server console.
-     */
-    private static final ThreadLocal<WarningSink> ACTIVE = new ThreadLocal<>();
-
-    /** Emit a lenient-mode warning to the active sink for this thread, falling back to the default. */
     static void warn(String message) {
-        WarningSink sink = ACTIVE.get();
-        (sink != null ? sink : DEFAULT_SINK).warn(message);
+        Consumer<String> sink = ACTIVE.get();
+        if (sink != null) sink.accept(message);
+        else LOG.warning(message);
     }
 
-    /**
-     * Install {@code sink} as the active lenient-warning sink for the current thread,
-     * returning the previously-installed sink so the caller can restore it in a finally.
-     * Pass {@code null} to clear.
-     */
-    static @Nullable WarningSink pushSink(@Nullable WarningSink sink) {
-        WarningSink prev = ACTIVE.get();
+    /** Install {@code sink} for the current thread; returns the previous one for restore-in-finally. */
+    static @Nullable Consumer<String> pushSink(@Nullable Consumer<String> sink) {
+        Consumer<String> prev = ACTIVE.get();
         if (sink == null) ACTIVE.remove();
         else ACTIVE.set(sink);
         return prev;
