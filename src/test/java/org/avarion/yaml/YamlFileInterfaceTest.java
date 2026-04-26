@@ -89,11 +89,20 @@ class YamlFileInterfaceTest extends TestCommon {
 
     @Test
     void testEnumerationsInvalidEnumItem() throws IOException {
-        (new ListMaterial()).save(target);
+        @YamlFile(lenient = Leniency.STRICT)
+        class StrictListMaterial extends YamlFileInterface {
+            @YamlKey("materials")
+            public List<Material> materials = Arrays.asList(Material.A, Material.B);
+
+            @YamlKey("enum")
+            public Material material = Material.C;
+        }
+
+        (new StrictListMaterial()).save(target);
         replaceInTarget("- 'B'", "- 'D'");
 
         IOException thrown = assertThrows(IOException.class, () -> {
-            new ListMaterial().load(target);
+            new StrictListMaterial().load(target);
         });
         assertTrue(thrown.getMessage().contains("No enum constant org.avarion.yaml.testClasses.Material.D"));
     }

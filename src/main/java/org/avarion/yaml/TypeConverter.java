@@ -17,6 +17,12 @@ final class TypeConverter {
 
     private static final Set<String> TRUE_VALUES = new HashSet<>(Arrays.asList("yes", "y", "true", "1"));
 
+    /**
+     * Sentinel returned by {@link #stringToEnum} when the YAML value is not a valid enum constant
+     * AND lenient mode is active. Collection/map iterators check for this sentinel and skip the entry.
+     */
+    static final Object LENIENT_ENUM_SKIP = new Object();
+
     private static final Map<Class<?>, Supplier<Collection<Object>>> COLLECTION_FACTORIES;
 
     static {
@@ -55,7 +61,7 @@ final class TypeConverter {
         }
 
         if (expectedType.isEnum() && value instanceof String convertedValue) {
-            return stringToEnum((Class<? extends Enum>) expectedType, convertedValue);
+            return stringToEnum((Class<? extends Enum>) expectedType, convertedValue, isLenient);
         }
 
         if (value instanceof List<?>) {
@@ -138,6 +144,9 @@ final class TypeConverter {
             for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
                 Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
                 Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
+                if (convertedKey == LENIENT_ENUM_SKIP || convertedValue == LENIENT_ENUM_SKIP) {
+                    continue;
+                }
                 result.put(convertedKey, convertedValue);
             }
             return result;
@@ -156,6 +165,9 @@ final class TypeConverter {
 
             for (Object item : (Collection<?>) value) {
                 Object convertedItem = convertWithType(elementType, item, isLenient);
+                if (convertedItem == LENIENT_ENUM_SKIP) {
+                    continue;
+                }
                 result.add(convertedItem);
             }
             return result;
@@ -187,6 +199,9 @@ final class TypeConverter {
 
         for (Object item : collection) {
             Object convertedValue = convertWithType(elementType, item, isLenient);
+            if (convertedValue == LENIENT_ENUM_SKIP) {
+                continue;
+            }
             result.add(convertedValue);
         }
         return result;
@@ -212,6 +227,9 @@ final class TypeConverter {
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
             Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
+            if (convertedKey == LENIENT_ENUM_SKIP || convertedValue == LENIENT_ENUM_SKIP) {
+                continue;
+            }
             result.put(convertedKey, convertedValue);
         }
         return result;
@@ -271,6 +289,11 @@ final class TypeConverter {
             else {
                 // Regular field: use getConvertedValue for type coercion
                 args[i] = getConvertedValue(null, componentType, value, isLenient);
+            }
+
+            // A record component cannot be skipped, so a lenient enum-skip becomes null
+            if (args[i] == LENIENT_ENUM_SKIP) {
+                args[i] = null;
             }
         }
 
@@ -356,8 +379,18 @@ final class TypeConverter {
         throw new IOException("Cannot convert String of length " + value.length() + " to Character");
     }
 
-    private static <E extends Enum<E>> @NotNull E stringToEnum(final Class<E> enumClass, final @NotNull String value) {
-        return Enum.valueOf(enumClass, value.toUpperCase());
+    /**
+     * Convert a String to an enum constant. Under lenient mode an unknown name yields
+     * {@link #LENIENT_ENUM_SKIP} instead of throwing; iterators in collection/map paths
+     * use that sentinel to drop the offending entry.
+     */
+    private static @NotNull Object stringToEnum(final Class<? extends Enum> enumClass, final @NotNull String value, boolean isLenient) {
+        try {
+            return Enum.valueOf(enumClass, value.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            if (!isLenient) throw ex;
+            return LENIENT_ENUM_SKIP;
+        }
     }
 
     // ==================== Reflection Utilities ====================

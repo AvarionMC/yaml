@@ -15,10 +15,6 @@ class TestCommon {
         return new String(Files.readAllBytes(target.toPath()));
     }
 
-    protected String readTarget() throws IOException {
-        return readFile();
-    }
-
     protected void replaceInTarget(String text, String replacement) throws IOException {
         // Read all lines from the file into a string
         Path filePath = target.toPath();
@@ -29,6 +25,10 @@ class TestCommon {
 
         // Write the modified content back to the file
         Files.write(filePath, content.getBytes(), StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
+    protected void writeYaml(String content) throws IOException {
+        Files.writeString(target.toPath(), content);
     }
 
     @BeforeEach

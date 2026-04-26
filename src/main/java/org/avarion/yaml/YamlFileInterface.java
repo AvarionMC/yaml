@@ -201,8 +201,13 @@ public abstract class YamlFileInterface {
 
         Object value = getNestedValue(data, key.split("\\."));
         if (value != UNKNOWN) {
+            Object converted = TypeConverter.getConvertedValue(field, value, isLenient);
+            if (converted == TypeConverter.LENIENT_ENUM_SKIP) {
+                // Lenient mode: bad enum value at top level — leave field at its default
+                return;
+            }
             field.setAccessible(true);
-            field.set(this, TypeConverter.getConvertedValue(field, value, isLenient));
+            field.set(this, converted);
         }
     }
 
