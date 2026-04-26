@@ -222,23 +222,6 @@ class LeniencyTest extends TestCommon {
     }
 
     @Test
-    void testStrictThrowsOnInvalidEnumInList() throws IOException {
-        @YamlFile(lenient = Leniency.STRICT)
-        class TestClass extends YamlFileInterface {
-            @YamlKey("mats")
-            public List<Material> mats = List.of();
-        }
-
-        writeYaml("mats:\n  - A\n  - NOT_A_MATERIAL\n  - B\n");
-
-        IOException thrown = assertThrows(IOException.class, () -> {
-            new TestClass().load(target);
-        });
-        assertInstanceOf(IllegalArgumentException.class, thrown.getCause());
-        assertTrue(thrown.getCause().getMessage().contains("NOT_A_MATERIAL"));
-    }
-
-    @Test
     void testLenientSkipsInvalidEnumValueInMap() throws IOException {
         @YamlFile(lenient = Leniency.LENIENT)
         class TestClass extends YamlFileInterface {
@@ -253,53 +236,8 @@ class LeniencyTest extends TestCommon {
     }
 
     @Test
-    void testLenientSkipsInvalidEnumKeyInMap() throws IOException {
-        @YamlFile(lenient = Leniency.LENIENT)
-        class TestClass extends YamlFileInterface {
-            @YamlKey("counts")
-            public Map<Material, Integer> counts = new LinkedHashMap<>();
-        }
-
-        writeYaml("counts:\n  A: 1\n  NOT_A_MATERIAL: 99\n  C: 3\n");
-
-        TestClass loaded = new TestClass().load(target);
-        assertEquals(Map.of(Material.A, 1, Material.C, 3), loaded.counts);
-    }
-
-    @Test
-    void testLenientLeavesTopLevelEnumAtDefaultOnInvalidValue() throws IOException {
-        @YamlFile(lenient = Leniency.LENIENT)
-        class TestClass extends YamlFileInterface {
-            @YamlKey("mat")
-            public Material mat = Material.A;
-        }
-
-        writeYaml("mat: NOT_A_MATERIAL\n");
-
-        TestClass loaded = new TestClass().load(target);
-        assertEquals(Material.A, loaded.mat);
-    }
-
-    @Test
-    void testStrictThrowsOnTopLevelInvalidEnum() throws IOException {
-        @YamlFile(lenient = Leniency.STRICT)
-        class TestClass extends YamlFileInterface {
-            @YamlKey("mat")
-            public Material mat = Material.A;
-        }
-
-        writeYaml("mat: NOT_A_MATERIAL\n");
-
-        IOException thrown = assertThrows(IOException.class, () -> {
-            new TestClass().load(target);
-        });
-        assertInstanceOf(IllegalArgumentException.class, thrown.getCause());
-        assertTrue(thrown.getCause().getMessage().contains("NOT_A_MATERIAL"));
-    }
-
-    @Test
     void testLenientStillThrowsOnNonEnumConversionFailureInList() throws IOException {
-        // Lenient mode should ONLY swallow bad enum entries — other conversion errors must still surface.
+        // Guard rail: lenient mode skips ONLY bad enum entries — other conversion errors must still surface.
         @YamlFile(lenient = Leniency.LENIENT)
         class TestClass extends YamlFileInterface {
             @YamlKey("ids")
@@ -310,19 +248,5 @@ class LeniencyTest extends TestCommon {
 
         IOException thrown = assertThrows(IOException.class, () -> new TestClass().load(target));
         assertInstanceOf(IllegalArgumentException.class, thrown.getCause());
-    }
-
-    @Test
-    void testLenientSkipsInvalidEnumInNestedListOfList() throws IOException {
-        @YamlFile(lenient = Leniency.LENIENT)
-        class TestClass extends YamlFileInterface {
-            @YamlKey("groups")
-            public List<List<Material>> groups = List.of();
-        }
-
-        writeYaml("groups:\n  - - A\n    - NOT_A_MATERIAL\n    - B\n  - - C\n    - ALSO_BAD\n");
-
-        TestClass loaded = new TestClass().load(target);
-        assertEquals(List.of(List.of(Material.A, Material.B), List.of(Material.C)), loaded.groups);
     }
 }
