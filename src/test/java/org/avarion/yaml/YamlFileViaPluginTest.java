@@ -152,12 +152,63 @@ class YamlFileViaPluginTest extends TestCommon {
         private Logger getLogger() { return Logger.getLogger("private.should.be.ignored"); }
     }
 
-    // Plugin with a public getLogger() that returns the wrong type — must be ignored.
+    // Plugin whose getLogger() returns an object with no warn/warning method — must fall back to default.
     static class WrongLoggerTypePlugin {
         private final File dataFolder;
         public WrongLoggerTypePlugin(File dataFolder) { this.dataFolder = dataFolder; }
         public File getDataFolder() { return dataFolder; }
         public String getLogger() { return "not a Logger"; }
+    }
+
+    // Plugin whose getLogger() returns null — must fall back to default.
+    static class NullLoggerPlugin {
+        private final File dataFolder;
+        public NullLoggerPlugin(File dataFolder) { this.dataFolder = dataFolder; }
+        public File getDataFolder() { return dataFolder; }
+        public Logger getLogger() { return null; }
+    }
+
+    // Logger whose warn(String) throws — verifies invokeQuietly swallows so the load doesn't blow up.
+    static class ThrowingLogger {
+        @SuppressWarnings("unused")
+        public void warn(String message) { throw new RuntimeException("boom"); }
+    }
+
+    static class ThrowingLoggerPlugin {
+        private final File dataFolder;
+        public ThrowingLoggerPlugin(File dataFolder) { this.dataFolder = dataFolder; }
+        public File getDataFolder() { return dataFolder; }
+        public ThrowingLogger getLogger() { return new ThrowingLogger(); }
+    }
+
+    // Fake SLF4J-style logger: exposes warn(String) but NOT warning(String). Records the calls.
+    static class Slf4jStyleLogger {
+        final List<String> warnings = new ArrayList<>();
+        @SuppressWarnings("unused")
+        public void warn(String message) { warnings.add(message); }
+    }
+
+    static class Slf4jPlugin {
+        private final File dataFolder;
+        private final Slf4jStyleLogger logger;
+        public Slf4jPlugin(File dataFolder, Slf4jStyleLogger logger) { this.dataFolder = dataFolder; this.logger = logger; }
+        public File getDataFolder() { return dataFolder; }
+        public Slf4jStyleLogger getLogger() { return logger; }
+    }
+
+    // Fake ALogger-style logger: exposes warning(String, Object...) varargs only.
+    static class VarargsStyleLogger {
+        final List<String> warnings = new ArrayList<>();
+        @SuppressWarnings("unused")
+        public void warning(String message, Object... args) { warnings.add(message); }
+    }
+
+    static class VarargsPlugin {
+        private final File dataFolder;
+        private final VarargsStyleLogger logger;
+        public VarargsPlugin(File dataFolder, VarargsStyleLogger logger) { this.dataFolder = dataFolder; this.logger = logger; }
+        public File getDataFolder() { return dataFolder; }
+        public VarargsStyleLogger getLogger() { return logger; }
     }
 
     @Test
@@ -197,17 +248,65 @@ class YamlFileViaPluginTest extends TestCommon {
         Files.writeString(new File(dataFolder, "config.yml").toPath(),
                 "mats:\n  - A\n  - NOT_A_MATERIAL\n");
 
-        // Private getLogger → reflection lookup must skip it; warning falls back to TypeConverter.LOG.
+        // Private getLogger → reflection lookup (getMethod) must skip it; warning falls back to TypeConverter.LOG.
         new EnumListConfig().load(new PrivateLoggerPlugin(dataFolder));
         assertThat(logs).hasSize(1);
         assertThat(logs.get(0).getMessage()).contains("NOT_A_MATERIAL");
 
         logs.clear();
 
-        // Public getLogger() with non-Logger return type must also be skipped.
+        // Public getLogger() returning an object with no warn/warning method → fall back.
         new EnumListConfig().load(new WrongLoggerTypePlugin(dataFolder));
         assertThat(logs).hasSize(1);
         assertThat(logs.get(0).getMessage()).contains("NOT_A_MATERIAL");
+
+        logs.clear();
+
+        // Public getLogger() returning null → fall back.
+        new EnumListConfig().load(new NullLoggerPlugin(dataFolder));
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0).getMessage()).contains("NOT_A_MATERIAL");
+    }
+
+    @Test
+    void testThrowingPluginLoggerDoesNotBreakLoad() throws IOException {
+        File dataFolder = tempDir.toFile();
+        Files.writeString(new File(dataFolder, "config.yml").toPath(),
+                "mats:\n  - A\n  - NOT_A_MATERIAL\n  - B\n");
+
+        // Plugin's logger.warn(String) throws — invokeQuietly must swallow so the load completes.
+        EnumListConfig loaded = new EnumListConfig().load(new ThrowingLoggerPlugin(dataFolder));
+        assertThat(loaded.mats).containsExactly(Material.A, Material.B);
+    }
+
+    @Test
+    void testWarningRoutesToSlf4jStyleWarnMethod() throws IOException {
+        File dataFolder = tempDir.toFile();
+        Files.writeString(new File(dataFolder, "config.yml").toPath(),
+                "mats:\n  - A\n  - NOT_A_MATERIAL\n");
+
+        Slf4jStyleLogger fake = new Slf4jStyleLogger();
+        new EnumListConfig().load(new Slf4jPlugin(dataFolder, fake));
+
+        // Routed to the SLF4J-style warn(String); default sink stayed silent.
+        assertThat(fake.warnings).hasSize(1);
+        assertThat(fake.warnings.get(0)).contains("NOT_A_MATERIAL");
+        assertThat(logs).isEmpty();
+    }
+
+    @Test
+    void testWarningRoutesToVarargsStyleWarningMethod() throws IOException {
+        File dataFolder = tempDir.toFile();
+        Files.writeString(new File(dataFolder, "config.yml").toPath(),
+                "mats:\n  - A\n  - NOT_A_MATERIAL\n");
+
+        VarargsStyleLogger fake = new VarargsStyleLogger();
+        new EnumListConfig().load(new VarargsPlugin(dataFolder, fake));
+
+        // Routed to warning(String, Object...) with empty varargs; default sink stayed silent.
+        assertThat(fake.warnings).hasSize(1);
+        assertThat(fake.warnings.get(0)).contains("NOT_A_MATERIAL");
+        assertThat(logs).isEmpty();
     }
 
     @Test

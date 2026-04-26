@@ -13,7 +13,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.*;
 import java.util.*;
-import java.util.logging.Logger;
 
 /**
  * Abstract class providing utility methods to handle YAML files, including
@@ -106,36 +105,65 @@ public abstract class YamlFileInterface {
      * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull Object plugin) throws IOException {
-        Logger pluginLogger = findPluginLogger(plugin);
-        Logger prev = TypeConverter.pushLogger(pluginLogger);
+        TypeConverter.WarningSink sink = discoverPluginSink(plugin);
+        TypeConverter.WarningSink prev = TypeConverter.pushSink(sink);
         try {
             return load(getYamlFile(plugin));
         } finally {
-            TypeConverter.pushLogger(prev);
+            TypeConverter.pushSink(prev);
         }
     }
 
     /**
-     * Reflectively find a public {@code getLogger()} method on the plugin (or any superclass)
-     * that returns a {@link Logger}, so lenient warnings emitted during the load surface
-     * under the plugin's own logger prefix on the server console. Returns {@code null}
-     * when no compatible method is found.
+     * Discover a {@link TypeConverter.WarningSink} on the given plugin so lenient warnings
+     * emitted during the load reach the plugin's own logger and surface under its prefix on
+     * the server console.
+     * <p>
+     * Algorithm: reflectively call public {@code getLogger()} on the plugin; on the result
+     * (any logger flavor), look for a public method named {@code warn} or {@code warning}
+     * that takes a single {@link String}, or one that takes {@code (String, Object[])}.
+     * Returns {@code null} if no compatible method is found, in which case the lib falls
+     * back to {@link TypeConverter#LOG}.
      */
-    private static @Nullable Logger findPluginLogger(@NotNull Object plugin) {
-        Class<?> currentClass = plugin.getClass();
-        while (currentClass != null) {
+    private static TypeConverter.@Nullable WarningSink discoverPluginSink(@NotNull Object plugin) {
+        Object loggerObj;
+        try {
+            loggerObj = plugin.getClass().getMethod("getLogger").invoke(plugin);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+        return loggerObj == null ? null : adaptToSink(loggerObj);
+    }
+
+    private static TypeConverter.@Nullable WarningSink adaptToSink(@NotNull Object logger) {
+        Class<?> cls = logger.getClass();
+        // Single-String overloads cover JUL (warning) and SLF4J (warn).
+        for (String name : new String[] { "warn", "warning" }) {
             try {
-                Method method = currentClass.getDeclaredMethod("getLogger");
-                if (Modifier.isPublic(method.getModifiers()) && Logger.class.isAssignableFrom(method.getReturnType())) {
-                    method.setAccessible(true);
-                    return (Logger) method.invoke(plugin);
-                }
-            } catch (ReflectiveOperationException ignored) {
-                // try the superclass
+                Method method = cls.getMethod(name, String.class);
+                return msg -> invokeQuietly(method, logger, msg);
+            } catch (NoSuchMethodException ignored) {
+                // try next name
             }
-            currentClass = currentClass.getSuperclass();
+        }
+        // (String, Object[]) overloads cover varargs-style loggers (Log4j2 Logger, ALogger, ...).
+        for (String name : new String[] { "warn", "warning" }) {
+            try {
+                Method method = cls.getMethod(name, String.class, Object[].class);
+                return msg -> invokeQuietly(method, logger, msg, new Object[0]);
+            } catch (NoSuchMethodException ignored) {
+                // try next name
+            }
         }
         return null;
+    }
+
+    private static void invokeQuietly(@NotNull Method method, @NotNull Object target, Object... args) {
+        try {
+            method.invoke(target, args);
+        } catch (ReflectiveOperationException ignored) {
+            // The plugin's logger threw — drop the warning rather than blow up the load.
+        }
     }
 
     // ==================== Save Methods ====================

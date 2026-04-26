@@ -18,27 +18,38 @@ final class TypeConverter {
 
     static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
-    /**
-     * Per-thread override for the lenient-warning logger. Set by {@link YamlFileInterface#load(Object)}
-     * to the plugin's own logger (via reflection on {@code getLogger()}) so warnings appear in the
-     * server console under the plugin's prefix instead of {@code org.avarion.yaml.TypeConverter}.
-     */
-    private static final ThreadLocal<Logger> ACTIVE_LOG = new ThreadLocal<>();
+    /** Receives a single lenient-mode warning message. Duck-typed onto whatever logger the plugin exposes. */
+    @FunctionalInterface
+    interface WarningSink {
+        void warn(String message);
+    }
 
-    static Logger log() {
-        Logger active = ACTIVE_LOG.get();
-        return active != null ? active : LOG;
+    /** Default sink — the library's own JUL logger. Used when no plugin sink is active. */
+    private static final WarningSink DEFAULT_SINK = LOG::warning;
+
+    /**
+     * Per-thread override for the lenient-warning sink. Set by {@link YamlFileInterface#load(Object)}
+     * after duck-typing the plugin's {@code getLogger()} result, so warnings reach the plugin's own
+     * logger (JUL, SLF4J, ALogger, anything else with a {@code warn}/{@code warning} method) and
+     * surface under the plugin's prefix in the server console.
+     */
+    private static final ThreadLocal<WarningSink> ACTIVE = new ThreadLocal<>();
+
+    /** Emit a lenient-mode warning to the active sink for this thread, falling back to the default. */
+    static void warn(String message) {
+        WarningSink sink = ACTIVE.get();
+        (sink != null ? sink : DEFAULT_SINK).warn(message);
     }
 
     /**
-     * Install {@code logger} as the active lenient-warning logger for the current thread,
-     * returning the previously-installed logger so the caller can restore it in a finally.
+     * Install {@code sink} as the active lenient-warning sink for the current thread,
+     * returning the previously-installed sink so the caller can restore it in a finally.
      * Pass {@code null} to clear.
      */
-    static @Nullable Logger pushLogger(@Nullable Logger logger) {
-        Logger prev = ACTIVE_LOG.get();
-        if (logger == null) ACTIVE_LOG.remove();
-        else ACTIVE_LOG.set(logger);
+    static @Nullable WarningSink pushSink(@Nullable WarningSink sink) {
+        WarningSink prev = ACTIVE.get();
+        if (sink == null) ACTIVE.remove();
+        else ACTIVE.set(sink);
         return prev;
     }
 
@@ -393,7 +404,7 @@ final class TypeConverter {
             if (!isLenient) {
                 throw new IOException("Double value " + doubleValue + " cannot be precisely represented as a float");
             }
-            log().warning(() -> "Lenient mode: lossy conversion of double " + doubleValue + " to float " + (float) doubleValue);
+            warn("Lenient mode: lossy conversion of double " + doubleValue + " to float " + (float) doubleValue);
         }
         return numValue.floatValue();
     }
@@ -407,7 +418,7 @@ final class TypeConverter {
             return value.charAt(0);
         }
         if (isLenient) {
-            log().warning(() -> "Lenient mode: truncating String '" + value + "' (length " + value.length() + ") to first character");
+            warn("Lenient mode: truncating String '" + value + "' (length " + value.length() + ") to first character");
             return value.charAt(0);
         }
         throw new IOException("Cannot convert String of length " + value.length() + " to Character");
@@ -423,7 +434,7 @@ final class TypeConverter {
             return Enum.valueOf(enumClass, value.toUpperCase());
         } catch (IllegalArgumentException ex) {
             if (!isLenient) throw ex;
-            log().warning(() -> "Lenient mode: skipping unknown " + enumClass.getName() + " value '" + value + "'");
+            warn("Lenient mode: skipping unknown " + enumClass.getName() + " value '" + value + "'");
             return LENIENT_ENUM_SKIP;
         }
     }
