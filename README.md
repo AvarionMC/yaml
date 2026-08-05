@@ -7,7 +7,8 @@ A simple, annotation-based YAML configuration library for Java. Built for Minecr
 - **Annotation-driven** - Define your config structure with simple annotations
 - **Type-safe** - Full support for primitives, collections, maps, enums, UUIDs, and Java Records
 - **Nested structures** - Use dot notation (`"database.host"`) for hierarchical configs
-- **Comments** - Add documentation directly in your YAML files
+- **Key naming** - Derive keys from field and record component names, in `snake_case` or verbatim
+- **Comments** - Add documentation directly in your YAML files, down to individual record components
 - **Leniency modes** - Strict or lenient type conversion
 - **Zero boilerplate** - No manual parsing or type casting
 
@@ -106,6 +107,27 @@ database:
   username: root
   password: secret
 ```
+
+Record components accept `@YamlComment` and `@YamlKey` too, so every key in the block can be
+documented and named independently:
+
+```java
+public record DatabaseConfig(
+        @YamlComment("Where the database lives") String host,
+        @YamlKey("PORT") int portNumber) {}
+```
+
+```yaml
+database:
+  # Where the database lives
+  host: localhost
+  PORT: 3306
+```
+
+Keys the library has to derive from a Java identifier — record components, and fields with a
+bare `@YamlKey` — are converted to `snake_case`, so `portNumber` would have become
+`port_number` had it not been named explicitly. Use `@YamlFile(naming = Naming.KEEP)` to keep
+identifiers exactly as written.
 
 ## Documentation
 

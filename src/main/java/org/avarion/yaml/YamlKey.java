@@ -15,6 +15,14 @@ import java.lang.annotation.Target;
  *     private String databaseUrl;
  * }
  * }</pre>
+ *
+ * <p>It can also be placed on a record component to rename that single key inside the record's
+ * block. Dot notation is not supported there: the key lives inside the record's own block and
+ * cannot be nested any further.</p>
+ *
+ * <pre>{@code
+ * public record ServerInfo(@YamlKey("bind_port") int port) {}
+ * }</pre>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD})

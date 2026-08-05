@@ -18,6 +18,13 @@ import java.lang.annotation.Target;
  *     private int serverPort = 8080;
  * }
  * }</pre>
+ *
+ * <p>It can also be placed on a record component, where it comments that single key inside the
+ * record's block rather than the block as a whole:</p>
+ *
+ * <pre>{@code
+ * public record ServerInfo(@YamlComment("The port number to listen on") int port) {}
+ * }</pre>
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD})

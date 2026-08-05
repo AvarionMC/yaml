@@ -27,6 +27,9 @@ class YamlWriter {
 
     private final YamlWrapper yamlWrapper;
 
+    /** How keys derived from a record component's name are spelled. */
+    private final Naming naming;
+
     /** Reflectively load a class by name, returning {@code null} when it's not on the classpath. */
     static @Nullable Class<?> loadOptional(@NotNull String className) {
         try {
@@ -62,7 +65,7 @@ class YamlWriter {
      */
     public String write(Map<Object, Object> nestedMap) throws IOException {
         StringBuilder result = new StringBuilder();
-        writeValue(result, nestedMap, "", "");
+        writeValue(result, nestedMap, "", "", true);
         return result.toString();
     }
 
@@ -70,14 +73,14 @@ class YamlWriter {
      * SINGLE DISPATCHER: Decides what type to write (Map, Collection, or scalar)
      * This is the ONLY place where we check the type of a value.
      */
-    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent) throws IOException {
+    private void writeValue(StringBuilder yaml, Object value, String firstIndent, String indent, boolean withComments) throws IOException {
         // Handle Records: convert to Map for YAML representation
         if (value != null && value.getClass().isRecord()) {
             value = recordToMap(value);
         }
 
         if (value instanceof Map) {
-            writeMap(yaml, (Map<?, ?>) value, firstIndent, indent);
+            writeMap(yaml, (Map<?, ?>) value, firstIndent, indent, withComments);
         }
         else if (value instanceof Collection) {
             writeCollection(yaml, (Collection<?>) value, indent);
@@ -90,7 +93,7 @@ class YamlWriter {
     /**
      * Primitive building block: Write a Map
      */
-    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String firstIndent, String indent) throws IOException {
+    private void writeMap(StringBuilder yaml, @NotNull Map<?, ?> map, String firstIndent, String indent, boolean withComments) throws IOException {
         boolean firstEntry = true;
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object key = entry.getKey();
@@ -98,14 +101,16 @@ class YamlWriter {
 
             // Handle comments from NestedNode
             if (value instanceof NestedMap.NestedNode node) {
-                appendComment(yaml, node.comment, indent);
+                if (withComments) {
+                    appendComment(yaml, node.comment, indent);
+                }
                 value = node.value;
             }
             yaml.append(firstEntry ? firstIndent:indent);
             firstEntry = false;
 
             yaml.append(key).append(":\n");
-            writeValue(yaml, value, indent + "  ", indent + "  ");
+            writeValue(yaml, value, indent + "  ", indent + "  ", withComments);
         }
     }
 
@@ -133,7 +138,9 @@ class YamlWriter {
                 yaml.append(indent);
             }
             yaml.append("- ");
-            writeValue(yaml, item, "", indent + "  ");
+            // A list item starts mid-line, right after the dash, so there is nowhere to put a
+            // comment; repeating the same record comments for every item would be noise anyway.
+            writeValue(yaml, item, "", indent + "  ", false);
         }
     }
 
@@ -154,6 +161,8 @@ class YamlWriter {
     /**
      * Converts a Record to a Map by extracting all component values.
      * Handles nested records by recursively converting them to Maps.
+     * Each value is wrapped in a {@link NestedMap.NestedNode} so a component's
+     * {@link YamlComment} travels with it, and the key honours its {@link YamlKey}.
      */
     private Map<String, Object> recordToMap(@NotNull Object potentialRecord) throws IOException {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -171,7 +180,7 @@ class YamlWriter {
                     value = recordToMap(value);
                 }
 
-                result.put(name, value);
+                result.put(RecordComponents.keyOf(component, naming), new NestedMap.NestedNode(value, RecordComponents.commentOf(component)));
             }
             catch (IllegalAccessException | InvocationTargetException e) {
                 throw new IOException("Failed to access record component '" + name + "': " + e.getMessage(), e);

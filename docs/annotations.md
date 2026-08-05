@@ -24,6 +24,7 @@ public class MyConfig extends YamlFileInterface {
 | `header`   | `String`   | `""`           | Comment text that appears at the top of the YAML file        |
 | `fileName` | `String`   | `"config.yml"` | Default filename when using `load(plugin)` or `save(plugin)` |
 | `lenient`  | `Leniency` | `LENIENT`      | Default leniency mode for all fields                         |
+| `naming`   | `Naming`   | `SNAKE_CASE`   | How keys derived from a Java identifier are spelled          |
 
 ### Example with Header
 
@@ -55,6 +56,31 @@ Output:
 version: 1
 ```
 
+### Naming Strategy
+
+Keys that the library has to *derive* from a Java identifier are converted according to
+`naming`. Keys you spell out yourself in a `@YamlKey("...")` are never touched.
+
+```java
+@YamlFile(naming = Naming.KEEP)
+public class Config extends YamlFileInterface {
+    // ...
+}
+```
+
+| Strategy     | `modelId` becomes | Notes                                             |
+|--------------|-------------------|---------------------------------------------------|
+| `SNAKE_CASE` | `model_id`        | The default                                       |
+| `KEEP`       | `modelId`         | Use the identifier exactly as written             |
+
+Conversion is acronym-aware: `httpURL` becomes `http_url` and `getHTTPHeader` becomes
+`get_http_header`. A trailing digit stays attached to its word, so `modelId2` becomes
+`model_id2`.
+
+`SNAKE_CASE` is the default, so a config whose keys were previously derived (record
+components, and fields with a bare `@YamlKey`) changes spelling. Set `naming = Naming.KEEP`
+to keep the old file readable.
+
 ---
 
 ## @YamlKey
@@ -68,10 +94,36 @@ public String myField = "default";
 
 ### Attributes
 
-| Attribute | Type       | Default     | Description                                           |
-|-----------|------------|-------------|-------------------------------------------------------|
-| `value`   | `String`   | *required*  | The YAML key path (supports dot notation for nesting) |
-| `lenient` | `Leniency` | `UNDEFINED` | Leniency mode for this specific field                 |
+| Attribute | Type       | Default     | Description                                                       |
+|-----------|------------|-------------|--------------------------------------------------------------------|
+| `value`   | `String`   | `""`        | The YAML key path (supports dot notation for nesting). Empty means "derive it from the field name" |
+| `lenient` | `Leniency` | `UNDEFINED` | Leniency mode for this specific field                             |
+
+### Bare @YamlKey
+
+Leave the value off to key a field by its own name, run through the class's
+[naming strategy](#naming-strategy):
+
+```java
+public class Config extends YamlFileInterface {
+
+    @YamlKey
+    public String serverName = "Main";      // -> server_name
+
+    @YamlKey("max_players")
+    public int maxPlayers = 20;             // -> max_players, exactly as written
+
+    public String scratch = "not config";   // no annotation: never persisted
+}
+```
+
+```yaml
+server_name: Main
+max_players: 20
+```
+
+A field with no `@YamlKey` at all is still ignored entirely — the annotation is what marks a
+field as configuration, and leaving its value blank only delegates the *spelling* of the key.
 
 ### Dot Notation for Nested Keys
 
@@ -122,6 +174,34 @@ public class Config extends YamlFileInterface {
 }
 ```
 
+### On Record Components
+
+`@YamlKey` also works on the components of a record, where it renames a single key
+inside the record's block. This lets a record keep Java naming while the YAML keeps
+whatever convention the config already uses:
+
+```java
+public record AltarDefinition(
+        @YamlKey("modelID") int modelId,
+        int searchRadius,
+        String name) {}
+```
+
+```yaml
+altar:
+  modelID: 1001      # spelled out, so used verbatim
+  search_radius: 8   # derived, so converted
+  name: blood
+```
+
+Components without a `@YamlKey` have their key derived from the component name via the
+[naming strategy](#naming-strategy). The rename applies to reading as well, so the file
+round-trips.
+
+Dot notation is **not** supported here — a record component is one key inside the record's
+own block, so it cannot spread itself over a nested path. A `@YamlKey` containing a `.` on a
+record component throws an `IOException` on both save and load.
+
 ---
 
 ## @YamlComment
@@ -171,6 +251,43 @@ public class Config extends YamlFileInterface {
     public int maxConnections = 100;
 }
 ```
+
+### On Record Components
+
+Annotate a record's components to comment every key inside the record's block instead of
+only the block as a whole:
+
+```java
+public record DatabaseConfig(
+        @YamlComment("Host the database listens on") String host,
+        @YamlComment("Port, usually 3306 for MySQL") int port,
+        String database) {}
+
+public class Config extends YamlFileInterface {
+
+    @YamlComment("Database settings")
+    @YamlKey("database")
+    public DatabaseConfig database = new DatabaseConfig("localhost", 3306, "myapp");
+}
+```
+
+Output:
+
+```yaml
+# Database settings
+database:
+  # Host the database listens on
+  host: localhost
+  # Port, usually 3306 for MySQL
+  port: 3306
+  database: myapp
+```
+
+This works at every nesting level, so a record inside a record is commented too.
+
+Records used as **list items** are written without component comments — a list entry starts
+after its `-` with nowhere to put a comment, and repeating the same block for every item
+would only add noise.
 
 ---
 

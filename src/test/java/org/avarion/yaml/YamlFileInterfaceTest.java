@@ -64,7 +64,9 @@ class YamlFileInterfaceTest extends TestCommon {
 
         NullOrEmptyKey loaded = new NullOrEmptyKey().load(target);
 
-        assertEquals("A", loaded.name1);
+        // An empty @YamlKey derives its key from the field name, so name1 is persisted.
+        assertEquals("1", loaded.name1);
+        // No @YamlKey at all is still never persisted, so name2 falls back to its default.
         assertEquals("B", loaded.name2);
         assertEquals("3", loaded.name3);
     }

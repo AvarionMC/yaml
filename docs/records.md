@@ -33,6 +33,48 @@ server:
   port: 25565
 ```
 
+## Annotating Record Components
+
+`@YamlComment` and `@YamlKey` can be placed directly on a record's components, so a record
+behaves like the block of fields it replaces instead of collapsing to a single commented key.
+
+```java
+public record ServerInfo(
+        @YamlComment("Shown in the server list") String name,
+
+        @YamlComment("Address to bind to") String bindAddress,
+
+        @YamlKey("PORT") int port) {}
+
+public class Config extends YamlFileInterface {
+
+    @YamlComment("Main server")
+    @YamlKey("server")
+    public ServerInfo server = new ServerInfo("Main Server", "127.0.0.1", 25565);
+}
+```
+
+```yaml
+# Main server
+server:
+  # Shown in the server list
+  name: Main Server
+  # Address to bind to
+  bind_address: 127.0.0.1
+  PORT: 25565
+```
+
+- `@YamlComment` puts a comment above that one key, at every nesting level.
+- `@YamlKey` renames that one key, for both writing and reading, so the file round-trips.
+  Components without a `@YamlKey` have their key derived from the component name using the
+  class's [naming strategy](annotations.md#naming-strategy), which converts to `snake_case`
+  by default — hence `bindAddress` becoming `bind_address` above, while the spelled-out
+  `PORT` is left alone.
+- Dot notation is not supported on a record component — the key lives inside the record's own
+  block, so a value containing a `.` throws an `IOException`.
+- Records used as list items are written without component comments; a list entry has nowhere
+  to put them, and repeating them per item would only add noise.
+
 ## Nested Records
 
 Records can contain other records:
@@ -60,7 +102,7 @@ contact:
   address:
     street: 123 Main St
     city: Springfield
-    zipCode: 12345
+    zip_code: 12345
 ```
 
 ## Maps with Record Values
@@ -85,11 +127,11 @@ public class GameConfig extends YamlFileInterface {
 ```yaml
 players:
   player1:
-    displayName: Alice
+    display_name: Alice
     level: 50
     experience: 125000
   player2:
-    displayName: Bob
+    display_name: Bob
     level: 42
     experience: 98000
 ```
@@ -154,17 +196,17 @@ team:
       address:
         street: 123 St
         city: City A
-        zipCode: 11111
+        zip_code: 11111
     - name: Bob
       age: 35
       address:
         street: 456 Ave
         city: City B
-        zipCode: 22222
+        zip_code: 22222
   headquarters:
     street: 1 HQ Blvd
     city: Capital
-    zipCode: 10000
+    zip_code: 10000
 ```
 
 ## Records with Maps
@@ -289,14 +331,14 @@ database:
 # Cache configuration
 cache:
   enabled: true
-  ttlSeconds: 3600
-  maxSize: 1000
+  ttl_seconds: 3600
+  max_size: 1000
 
 # Web server settings
 server:
   name: MyApp Server
   port: 8080
-  allowedOrigins:
+  allowed_origins:
     - http://localhost:3000
     - https://myapp.com
 ```

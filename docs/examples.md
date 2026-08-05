@@ -126,7 +126,7 @@ public record WorldSettings(
     String name,
     String generator,
     long seed,
-    boolean allowPvP,
+    boolean allowPvp,
     List<String> allowedGamemodes
 ) {}
 
@@ -193,8 +193,8 @@ worlds:
     name: world
     generator: default
     seed: 12345
-    allowPvP: true
-    allowedGamemodes:
+    allow_pvp: true
+    allowed_gamemodes:
       - SURVIVAL
       - ADVENTURE
 
@@ -203,8 +203,8 @@ worlds:
     name: creative
     generator: flat
     seed: 0
-    allowPvP: false
-    allowedGamemodes:
+    allow_pvp: false
+    allowed_gamemodes:
       - CREATIVE
 
 # Server spawn location
@@ -219,8 +219,8 @@ spawn:
 # Economy configuration
 economy:
   currency: coins
-  startingBalance: 100.0
-  maxBalance: 1000000.0
+  starting_balance: 100.0
+  max_balance: 1000000.0
   prices:
     diamond: 100.0
     emerald: 50.0
