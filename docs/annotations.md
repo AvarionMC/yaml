@@ -77,6 +77,12 @@ Conversion is acronym-aware: `httpURL` becomes `http_url` and `getHTTPHeader` be
 `get_http_header`. A trailing digit stays attached to its word, so `modelId2` becomes
 `model_id2`.
 
+> **Watch out for consecutive single capitals.** A run of capitals is kept together only when
+> a lowercase letter follows it, so `getHTTPHeader` splits sensibly but `allowPvP` becomes
+> `allow_pv_p` — each lone capital starts its own word. If that is not the key you want, spell
+> it out with `@YamlKey("allow_pvp")`, switch the class to `Naming.KEEP`, or name the
+> identifier `allowPvp` so there is only one boundary to find.
+
 `SNAKE_CASE` is the default, so a config whose keys were previously derived (record
 components, and fields with a bare `@YamlKey`) changes spelling. Set `naming = Naming.KEEP`
 to keep the old file readable.

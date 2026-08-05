@@ -28,6 +28,8 @@ class NamingTests extends TestCommon {
             "name1,         name1",
             "already_snake, already_snake",
             "URL,           url",
+            // Consecutive single capitals each start a word. Documented as a sharp edge.
+            "allowPvP,      allow_pv_p",
     })
     void testSnakeCaseConversion(String identifier, String expected) {
         assertEquals(expected, Naming.SNAKE_CASE.convert(identifier));
