@@ -61,20 +61,22 @@ final class TypeConverter {
     /** How keys derived from a record component's name are spelled. */
     private final Naming naming;
 
+    /** Whether a value that doesn't fit its target type is coerced with a warning, or rejected outright. */
+    private final boolean isLenient;
+
     // ==================== Main Entry Points ====================
 
     /**
      * Convert a value to the type specified by the field.
      */
-    @Nullable Object getConvertedValue(final @NotNull Field field, final Object value, boolean isLenient) throws IOException {
-        return getConvertedValue(field, field.getType(), value, isLenient);
+    @Nullable Object getConvertedValue(final @NotNull Field field, final Object value) throws IOException {
+        return getConvertedValue(field, field.getType(), value);
     }
 
     /**
      * Convert a value to the expected type with optional field context.
      */
-    @Nullable Object getConvertedValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value, boolean isLenient) throws IOException {
+    @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value) throws IOException {
         if (value == null) {
             return handleNullValue(expectedType, field);
         }
@@ -86,19 +88,19 @@ final class TypeConverter {
         }
 
         if (expectedType.isEnum() && value instanceof String convertedValue) {
-            return stringToEnum((Class<? extends Enum>) expectedType, convertedValue, isLenient);
+            return stringToEnum((Class<? extends Enum>) expectedType, convertedValue);
         }
 
         if (value instanceof List<?>) {
-            return handleCollectionValue(field, expectedType, (Collection<?>) value, isLenient);
+            return handleCollectionValue(field, expectedType, (Collection<?>) value);
         }
         if (Collection.class.isAssignableFrom(expectedType) && isLenient) {
             // We allow a single String/int/... to be assigned to a Collection -- but only when we're in lenient mode
-            return handleCollectionValue(field, expectedType, List.of(value), isLenient);
+            return handleCollectionValue(field, expectedType, List.of(value));
         }
 
         if (value instanceof Map && Map.class.isAssignableFrom(expectedType)) {
-            return handleMapValue(field, expectedType, (Map<?, ?>) value, isLenient);
+            return handleMapValue(field, expectedType, (Map<?, ?>) value);
         }
 
         if (expectedType.isInstance(value)) {
@@ -114,16 +116,16 @@ final class TypeConverter {
         }
 
         if (Number.class.isAssignableFrom(value.getClass())) {
-            return convertToNumber((Number) value, expectedType, isLenient);
+            return convertToNumber((Number) value, expectedType);
         }
 
         if (isCharacterType(expectedType)) {
-            return convertToCharacter(String.valueOf(value), isLenient);
+            return convertToCharacter(String.valueOf(value));
         }
 
         // Handle Records: convert Map to Record using canonical constructor
         if (value instanceof Map && expectedType.isRecord()) {
-            return convertMapToRecord(expectedType, (Map<?, ?>) value, isLenient);
+            return convertMapToRecord(expectedType, (Map<?, ?>) value);
         }
 
         // For other classes, attempt to use their constructor that takes a String parameter
@@ -146,7 +148,7 @@ final class TypeConverter {
      * This method handles parameterized types (Maps/Collections with generic info).
      * For simple types, it delegates to getConvertedValue to avoid code duplication.
      */
-    @Nullable Object convertWithType(final @NotNull Type type, final Object value, boolean isLenient) throws IOException {
+    @Nullable Object convertWithType(final @NotNull Type type, final Object value) throws IOException {
         Class<?> rawClass = getRawClass(type);
 
         if (value == null) {
@@ -167,8 +169,8 @@ final class TypeConverter {
             }
 
             for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
-                Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
-                Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
+                Object convertedKey = convertWithType(keyType, entry.getKey());
+                Object convertedValue = convertWithType(valueType, entry.getValue());
                 if (convertedKey == LENIENT_ENUM_SKIP || convertedValue == LENIENT_ENUM_SKIP) {
                     continue;
                 }
@@ -189,7 +191,7 @@ final class TypeConverter {
             }
 
             for (Object item : (Collection<?>) value) {
-                Object convertedItem = convertWithType(elementType, item, isLenient);
+                Object convertedItem = convertWithType(elementType, item);
                 if (convertedItem == LENIENT_ENUM_SKIP) {
                     continue;
                 }
@@ -200,7 +202,7 @@ final class TypeConverter {
 
         // For all other types (primitives, String, enums, UUID, numbers, chars, etc.),
         // delegate to getConvertedValue which has all the conversion logic in one place.
-        return getConvertedValue(null, rawClass, value, isLenient);
+        return getConvertedValue(null, rawClass, value);
     }
 
     // ==================== Collection Handling ====================
@@ -209,8 +211,7 @@ final class TypeConverter {
      * Convert the incoming value into a Set/List/Queue.
      */
     private @NotNull Object handleCollectionValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection, boolean isLenient)
-            throws IOException {
+            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection) throws IOException {
 
         Collection<Object> result = createCollectionInstance(expectedType);
 
@@ -220,7 +221,7 @@ final class TypeConverter {
                 : Object.class;
 
         for (Object item : collection) {
-            Object convertedValue = convertWithType(elementType, item, isLenient);
+            Object convertedValue = convertWithType(elementType, item);
             if (convertedValue == LENIENT_ENUM_SKIP) {
                 continue;
             }
@@ -232,8 +233,7 @@ final class TypeConverter {
     /**
      * Convert the incoming value into a Map with properly typed keys and values.
      */
-    private @NotNull Object handleMapValue(
-            final @NotNull Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map, boolean isLenient) throws IOException {
+    private @NotNull Object handleMapValue(final @NotNull Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map) throws IOException {
 
         Map<Object, Object> result = new LinkedHashMap<>();
 
@@ -247,8 +247,8 @@ final class TypeConverter {
         }
 
         for (Map.Entry<?, ?> entry : map.entrySet()) {
-            Object convertedKey = convertWithType(keyType, entry.getKey(), isLenient);
-            Object convertedValue = convertWithType(valueType, entry.getValue(), isLenient);
+            Object convertedKey = convertWithType(keyType, entry.getKey());
+            Object convertedValue = convertWithType(valueType, entry.getValue());
             if (convertedKey == LENIENT_ENUM_SKIP || convertedValue == LENIENT_ENUM_SKIP) {
                 continue;
             }
@@ -276,7 +276,7 @@ final class TypeConverter {
      * Supports nested records: if a component is itself a record and the value is a Map,
      * it will recursively convert the nested Map to the nested record type.
      */
-    private @NotNull Object convertMapToRecord(final @NotNull Class<?> recordClass, final @NotNull Map<?, ?> map, boolean isLenient) throws IOException {
+    private @NotNull Object convertMapToRecord(final @NotNull Class<?> recordClass, final @NotNull Map<?, ?> map) throws IOException {
         RecordComponent[] components = recordClass.getRecordComponents();
         Object[] args = new Object[components.length];
 
@@ -298,19 +298,19 @@ final class TypeConverter {
             }
             else if (value instanceof Map && componentType.isRecord()) {
                 // Nested record: recursively convert
-                args[i] = convertMapToRecord(componentType, (Map<?, ?>) value, isLenient);
+                args[i] = convertMapToRecord(componentType, (Map<?, ?>) value);
             }
             else if (value instanceof Map && Map.class.isAssignableFrom(componentType)) {
                 // Map field within record: use convertWithType for proper type handling
-                args[i] = convertWithType(genericType, value, isLenient);
+                args[i] = convertWithType(genericType, value);
             }
             else if (value instanceof Collection && Collection.class.isAssignableFrom(componentType)) {
                 // Collection field within record: use convertWithType for proper type handling
-                args[i] = convertWithType(genericType, value, isLenient);
+                args[i] = convertWithType(genericType, value);
             }
             else {
                 // Regular field: use getConvertedValue for type coercion
-                args[i] = getConvertedValue(null, componentType, value, isLenient);
+                args[i] = getConvertedValue(null, componentType, value);
             }
 
             // A record component cannot be skipped, so a lenient enum-skip becomes null
@@ -359,7 +359,7 @@ final class TypeConverter {
         return TRUE_VALUES.contains(strValue);
     }
 
-    private static Object convertToNumber(final Number numValue, final Class<?> expectedType, boolean isLenient) throws IOException {
+    private Object convertToNumber(final Number numValue, final Class<?> expectedType) throws IOException {
         if (expectedType == int.class || expectedType == Integer.class) {
             return numValue.intValue();
         }
@@ -367,7 +367,7 @@ final class TypeConverter {
             return numValue.doubleValue();
         }
         if (expectedType == float.class || expectedType == Float.class) {
-            return convertToFloat(numValue, isLenient);
+            return convertToFloat(numValue);
         }
         if (expectedType == long.class || expectedType == Long.class) {
             return numValue.longValue();
@@ -381,7 +381,7 @@ final class TypeConverter {
         throw new IOException("Cannot convert " + numValue.getClass().getSimpleName() + " to " + expectedType.getSimpleName());
     }
 
-    private static float convertToFloat(final @NotNull Number numValue, boolean isLenient) throws IOException {
+    private float convertToFloat(final @NotNull Number numValue) throws IOException {
         double doubleValue = numValue.doubleValue();
         boolean lossy = Math.abs(doubleValue - (float) doubleValue) >= 1e-9;
         if (lossy) {
@@ -397,7 +397,7 @@ final class TypeConverter {
         return type == char.class || type == Character.class;
     }
 
-    private static @NotNull Character convertToCharacter(final @NotNull String value, boolean isLenient) throws IOException {
+    private @NotNull Character convertToCharacter(final @NotNull String value) throws IOException {
         if (value.length() == 1) {
             return value.charAt(0);
         }
@@ -413,7 +413,7 @@ final class TypeConverter {
      * {@link #LENIENT_ENUM_SKIP} instead of throwing; iterators in collection/map paths
      * use that sentinel to drop the offending entry.
      */
-    private static @NotNull Object stringToEnum(final Class<? extends Enum> enumClass, final @NotNull String value, boolean isLenient) {
+    private @NotNull Object stringToEnum(final Class<? extends Enum> enumClass, final @NotNull String value) {
         try {
             return Enum.valueOf(enumClass, value.toUpperCase());
         } catch (IllegalArgumentException ex) {
