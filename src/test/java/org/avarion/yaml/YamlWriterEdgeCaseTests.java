@@ -127,27 +127,6 @@ class YamlWriterEdgeCaseTests extends TestCommon {
         assertDoesNotThrow(() -> config.save(target));
     }
 
-    @Test
-    void testNormalizeCollectionWithNonComparableSet() {
-        // Create a set with non-comparable objects
-        class NonComparable {
-            final String value;
-            NonComparable(String value) { this.value = value; }
-        }
-
-        // This tests the path where Set elements are not Comparable
-        Set<NonComparable> nonComparableSet = new LinkedHashSet<>();
-        nonComparableSet.add(new NonComparable("a"));
-        nonComparableSet.add(new NonComparable("b"));
-
-        // Should not throw when normalizing non-comparable set
-        // (The normalizeCollection should just convert to ArrayList without sorting)
-        assertDoesNotThrow(() -> {
-            List<?> normalized = new ArrayList<>(nonComparableSet);
-            assertEquals(2, normalized.size());
-        });
-    }
-
     enum TestEnum { VALUE_A, VALUE_B }
 
     @Test

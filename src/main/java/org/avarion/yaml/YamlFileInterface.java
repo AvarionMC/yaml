@@ -312,7 +312,7 @@ public abstract class YamlFileInterface {
 
     private void appendHeaderComment(StringBuilder result, String header) {
         for (String line : header.split("\\r?\\n")) {
-            result.append("# ").append(line.replaceAll("\\s*$", "")).append("\n");
+            result.append("# ").append(line.stripTrailing()).append("\n");
         }
     }
 
