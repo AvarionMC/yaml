@@ -13,7 +13,7 @@ public class SoundImpl implements Sound {
 
     @Override
     public @NotNull NamespacedKey getKey() {
-        return new NamespacedKey(name);
+        return new NamespacedKey("sound", name);
     }
 
     @Override
