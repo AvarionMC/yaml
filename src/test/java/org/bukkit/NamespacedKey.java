@@ -4,11 +4,9 @@ import net.kyori.adventure.key.Key;
 import org.jetbrains.annotations.NotNull;
 
 public final class NamespacedKey implements Key {
-    private final String ns;
     private final String key;
 
-    public NamespacedKey(String ns, String key) {
-        this.ns = ns;
+    public NamespacedKey(String key) {
         this.key = key;
     }
 
