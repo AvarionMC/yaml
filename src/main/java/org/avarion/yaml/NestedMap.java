@@ -1,5 +1,7 @@
 package org.avarion.yaml;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.avarion.yaml.exceptions.DuplicateKey;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -8,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 class NestedMap {
+	@Getter
 	private final Map<Object, Object> map = new LinkedHashMap<>();
 
 	@SuppressWarnings("unchecked")
@@ -27,17 +30,9 @@ class NestedMap {
 		current.put(lastKey, new NestedNode(value, comment));
 	}
 
-	public Map<Object, Object> getMap() {
-		return map;
-	}
-
+	@RequiredArgsConstructor
 	public static class NestedNode {
 		public final Object value;
 		public final @Nullable String comment;
-
-		public NestedNode(@Nullable Object value, @Nullable String comment) {
-			this.value = value;
-			this.comment = comment;
-		}
 	}
 }

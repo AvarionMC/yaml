@@ -1,5 +1,7 @@
 package org.avarion.yaml;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.avarion.yaml.testClasses.Material;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,12 +38,11 @@ class PluginLoggerRoutingTest extends TestCommon {
     // ===== Plugin fixtures =====
 
     /** Bukkit/Spigot-style: getLogger() returns a real JUL Logger. */
+    @Getter
+    @RequiredArgsConstructor
     static class JulLoggerPlugin {
         private final File dataFolder;
         private final Logger logger;
-        public JulLoggerPlugin(File dataFolder, Logger logger) { this.dataFolder = dataFolder; this.logger = logger; }
-        public File getDataFolder() { return dataFolder; }
-        public Logger getLogger() { return logger; }
     }
 
     /** Modern-Paper-style: a fake logger exposing only {@code warn(String)}. */
@@ -49,12 +50,11 @@ class PluginLoggerRoutingTest extends TestCommon {
         final List<String> warnings = new ArrayList<>();
         public void warn(String message) { warnings.add(message); }
     }
+    @Getter
+    @RequiredArgsConstructor
     static class Slf4jPlugin {
         private final File dataFolder;
         private final Slf4jStyleLogger logger;
-        public Slf4jPlugin(File dataFolder, Slf4jStyleLogger logger) { this.dataFolder = dataFolder; this.logger = logger; }
-        public File getDataFolder() { return dataFolder; }
-        public Slf4jStyleLogger getLogger() { return logger; }
     }
 
     /** Log4j2/ALogger-style: only {@code warning(String, Object...)} varargs. */
@@ -62,36 +62,35 @@ class PluginLoggerRoutingTest extends TestCommon {
         final List<String> warnings = new ArrayList<>();
         public void warning(String message, Object... args) { warnings.add(message); }
     }
+    @Getter
+    @RequiredArgsConstructor
     static class VarargsPlugin {
         private final File dataFolder;
         private final VarargsStyleLogger logger;
-        public VarargsPlugin(File dataFolder, VarargsStyleLogger logger) { this.dataFolder = dataFolder; this.logger = logger; }
-        public File getDataFolder() { return dataFolder; }
-        public VarargsStyleLogger getLogger() { return logger; }
     }
 
     /** getLogger() is private — must be ignored by the public-method lookup. */
+    @Getter
+    @RequiredArgsConstructor
     static class PrivateLoggerPlugin {
         private final File dataFolder;
-        public PrivateLoggerPlugin(File dataFolder) { this.dataFolder = dataFolder; }
-        public File getDataFolder() { return dataFolder; }
         @SuppressWarnings("unused")
         private Logger getLogger() { return Logger.getLogger("private.should.be.ignored"); }
     }
 
     /** getLogger() returns an object with no warn/warning method — must fall back. */
+    @Getter
+    @RequiredArgsConstructor
     static class WrongLoggerTypePlugin {
         private final File dataFolder;
-        public WrongLoggerTypePlugin(File dataFolder) { this.dataFolder = dataFolder; }
-        public File getDataFolder() { return dataFolder; }
         public String getLogger() { return "not a Logger"; }
     }
 
     /** getLogger() returns null — must fall back. */
+    @Getter
+    @RequiredArgsConstructor
     static class NullLoggerPlugin {
         private final File dataFolder;
-        public NullLoggerPlugin(File dataFolder) { this.dataFolder = dataFolder; }
-        public File getDataFolder() { return dataFolder; }
         public Logger getLogger() { return null; }
     }
 
@@ -99,10 +98,10 @@ class PluginLoggerRoutingTest extends TestCommon {
     static class ThrowingLogger {
         public void warn(String message) { throw new RuntimeException("boom"); }
     }
+    @Getter
+    @RequiredArgsConstructor
     static class ThrowingLoggerPlugin {
         private final File dataFolder;
-        public ThrowingLoggerPlugin(File dataFolder) { this.dataFolder = dataFolder; }
-        public File getDataFolder() { return dataFolder; }
         public ThrowingLogger getLogger() { return new ThrowingLogger(); }
     }
 

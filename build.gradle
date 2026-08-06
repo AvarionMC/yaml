@@ -160,7 +160,8 @@ dependencies {
     // lombok
     commonCompileOnly 'org.projectlombok:lombok:1.18.46'
     commonAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
-    testImplementation 'org.projectlombok:lombok:1.18.46'
+    testCompileOnly 'org.projectlombok:lombok:1.18.46'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
 }
 
 jar {

@@ -1,15 +1,13 @@
 package org.bukkit;
 
+import lombok.RequiredArgsConstructor;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.key.KeyImpl;
 import org.jetbrains.annotations.NotNull;
 
+@RequiredArgsConstructor
 public class SoundImpl implements Sound {
     private final String name;
-
-    public SoundImpl(String name) {
-        this.name = name;
-    }
 
     @Override
     public @NotNull NamespacedKey getKey() {

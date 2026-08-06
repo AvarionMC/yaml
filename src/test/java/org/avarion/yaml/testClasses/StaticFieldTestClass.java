@@ -1,8 +1,13 @@
 package org.avarion.yaml.testClasses;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 /**
  * Test class with various static field configurations for testing getStaticFieldName
  */
+@Getter
+@RequiredArgsConstructor
 public class StaticFieldTestClass {
     // Public static field - should be found
     public static final StaticFieldTestClass PUBLIC_INSTANCE = new StaticFieldTestClass("public");
@@ -18,17 +23,9 @@ public class StaticFieldTestClass {
 
     private final String name;
 
-    public StaticFieldTestClass(String name) {
-        this.name = name;
-    }
-
     @Override
     public String toString() {
         // Return generic toString format to match the pattern in formatValue
         return getClass().getName() + "@" + Integer.toHexString(hashCode());
-    }
-
-    public String getName() {
-        return name;
     }
 }
