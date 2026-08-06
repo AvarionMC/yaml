@@ -23,21 +23,33 @@ final class TypeConverter {
     static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
     /**
-     * Per-thread sink for lenient warnings. Always non-null — defaults to {@link #LOG}'s
-     * {@code warning(String)} so callers don't need to null-check.
-     * {@link YamlFileInterface#load(Object)} replaces it with the plugin's logger for the
-     * duration of the load.
+     * Per-thread sink for lenient warnings, unset unless a caller installs one.
+     * {@link YamlFileInterface#load(Object)} installs the plugin's logger for the duration
+     * of the load, then restores what was there before.
      */
-    private static final ThreadLocal<Consumer<String>> ACTIVE = ThreadLocal.withInitial(() -> LOG::warning);
+    private static final ThreadLocal<Consumer<String>> ACTIVE = new ThreadLocal<>();
 
     static void warn(String message) {
-        ACTIVE.get().accept(message);
+        Consumer<String> sink = ACTIVE.get();
+        if (sink == null) {
+            LOG.warning(message);
+        } else {
+            sink.accept(message);
+        }
     }
 
-    /** Install {@code sink} for the current thread; returns the previous one for restore-in-finally. */
-    static Consumer<String> pushSink(@NotNull Consumer<String> sink) {
+    /**
+     * Install {@code sink} for the current thread; returns the previous one for restore-in-finally.
+     * A {@code null} sink clears the entry rather than parking a stale reference on a thread that
+     * may outlive the load — server thread pools are long-lived.
+     */
+    static @Nullable Consumer<String> pushSink(final @Nullable Consumer<String> sink) {
         Consumer<String> prev = ACTIVE.get();
-        ACTIVE.set(sink);
+        if (sink == null) {
+            ACTIVE.remove();
+        } else {
+            ACTIVE.set(sink);
+        }
         return prev;
     }
 

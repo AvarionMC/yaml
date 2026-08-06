@@ -7,7 +7,10 @@ public class StaticFieldTestClass {
     // Public static field - should be found
     public static final StaticFieldTestClass PUBLIC_INSTANCE = new StaticFieldTestClass("public");
 
-    // Private static field - should NOT be found (not public)
+    // Private static field - should NOT be found (not public). Read only by reflection, in
+    // YamlWriter#getStaticFieldName: it is the sole case exercising the canAccess(null) == false
+    // branch, so deleting it drops that method from 8/8 to 7/8 branches covered.
+    @SuppressWarnings("unused")
     private static final StaticFieldTestClass PRIVATE_INSTANCE = new StaticFieldTestClass("private");
 
     // Public static but different value - should NOT match
