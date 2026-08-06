@@ -17,40 +17,43 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class TypeConverterDirectTest {
 
+    /** Stateless apart from its naming strategy, so one instance serves every test. */
+    private static final TypeConverter converter = new TypeConverter(Naming.SNAKE_CASE);
+
     // ==================== getConvertedValue tests ====================
 
     @Test
     void testObjectTypeWithMapValueReturnsAsIs() throws IOException {
         Map<String, Object> mapValue = Map.of("key", "value");
-        Object result = TypeConverter.getConvertedValue(null, Object.class, mapValue, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Object.class, mapValue, false);
         assertSame(mapValue, result);
     }
 
     @Test
     void testObjectTypeWithCollectionValueReturnsAsIs() throws IOException {
         List<String> listValue = List.of("a", "b");
-        Object result = TypeConverter.getConvertedValue(null, Object.class, listValue, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Object.class, listValue, false);
         assertSame(listValue, result);
     }
 
     @Test
     void testObjectTypeWithScalarValueDoesNotReturnAsIs() throws IOException {
         // Object.class + non-collection/non-map → should fall through to isInstance check
-        Object result = TypeConverter.getConvertedValue(null, Object.class, "hello", false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Object.class, "hello", false);
         assertEquals("hello", result);
     }
 
     @Test
     void testNullValueForPrimitiveWithoutFieldThrowsWithoutFieldName() {
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, int.class, null, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, int.class, null, false));
         assertEquals("Cannot assign null to primitive type int", thrown.getMessage());
         assertFalse(thrown.getMessage().contains("field:"));
     }
 
     @Test
     void testNullValueForNonPrimitiveReturnsNull() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, String.class, null, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, String.class, null, false);
         assertNull(result);
     }
 
@@ -58,7 +61,7 @@ class TypeConverterDirectTest {
     void testEnumTypeWithNonStringValueFallsThrough() {
         // Enum type but value is Integer → should fall through enum check, hit Number check, then throw
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, Material.class, 42, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, Material.class, 42, false));
         assertTrue(thrown.getMessage().contains("Cannot convert Integer to Material"));
     }
 
@@ -67,7 +70,7 @@ class TypeConverterDirectTest {
         // value is Map but expectedType is not Map and not Record → falls through to constructor/field attempts
         Map<String, Object> mapValue = Map.of("key", "value");
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, Integer.class, mapValue, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, Integer.class, mapValue, false));
         assertTrue(thrown.getMessage().contains("I cannot figure out how to retrieve this type"));
     }
 
@@ -75,7 +78,7 @@ class TypeConverterDirectTest {
     void testStringValueWithNonUuidExpectedType() throws IOException {
         // String value with non-UUID expectedType → should not enter UUID branch
         // String for a String field → isInstance returns true
-        Object result = TypeConverter.getConvertedValue(null, String.class, "hello", false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, String.class, "hello", false);
         assertEquals("hello", result);
     }
 
@@ -83,20 +86,20 @@ class TypeConverterDirectTest {
     void testNonStringValueWithUuidExpectedType() {
         // Non-string value for UUID type → skip UUID branch, skip boolean, hit Number, throw
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, UUID.class, 42, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, UUID.class, 42, false));
         assertTrue(thrown.getMessage().contains("Cannot convert"));
     }
 
     @Test
     void testBooleanConversionFromBooleanObject() throws IOException {
         // Direct Boolean value → convertToBoolean returns as-is
-        Object result = TypeConverter.getConvertedValue(null, Boolean.class, Boolean.TRUE, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Boolean.class, Boolean.TRUE, false);
         assertEquals(Boolean.TRUE, result);
     }
 
     @Test
     void testBooleanConversionFromStringNo() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, boolean.class, "no", false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, boolean.class, "no", false);
         assertEquals(Boolean.FALSE, result);
     }
 
@@ -104,14 +107,14 @@ class TypeConverterDirectTest {
     void testCollectionWithLenientFalseDoesNotConvertSingleValue() {
         // Single String value, Collection expectedType, but NOT lenient → should fall through
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, List.class, "single", false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, List.class, "single", false));
         assertTrue(thrown.getMessage().contains("I cannot figure out how to retrieve this type"));
     }
 
     @Test
     void testCollectionWithLenientTrueConvertsSingleValue() throws IOException {
         // Single String value, Collection expectedType, lenient → wraps in List
-        Object result = TypeConverter.getConvertedValue(null, List.class, "single", true, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, List.class, "single", true);
         assertInstanceOf(List.class, result);
         assertEquals(List.of("single"), result);
     }
@@ -121,13 +124,13 @@ class TypeConverterDirectTest {
     @Test
     void testConvertWithTypeNullForPrimitiveThrows() {
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.convertWithType(int.class, null, false, Naming.SNAKE_CASE));
+                converter.convertWithType(int.class, null, false));
         assertEquals("Cannot assign null to primitive type int", thrown.getMessage());
     }
 
     @Test
     void testConvertWithTypeNullForNonPrimitiveReturnsNull() throws IOException {
-        Object result = TypeConverter.convertWithType(String.class, null, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(String.class, null, false);
         assertNull(result);
     }
 
@@ -136,7 +139,7 @@ class TypeConverterDirectTest {
         // Map value with raw Map.class type (no parameterized type info)
         Map<String, Object> mapValue = new LinkedHashMap<>();
         mapValue.put("key", "value");
-        Object result = TypeConverter.convertWithType(Map.class, mapValue, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(Map.class, mapValue, false);
         assertInstanceOf(Map.class, result);
     }
 
@@ -144,13 +147,13 @@ class TypeConverterDirectTest {
     void testConvertWithTypeCollectionWithRawClass() throws IOException {
         // Collection value with raw List.class type (no parameterized type info)
         List<String> listValue = List.of("a", "b");
-        Object result = TypeConverter.convertWithType(List.class, listValue, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(List.class, listValue, false);
         assertInstanceOf(List.class, result);
     }
 
     @Test
     void testConvertWithTypeScalar() throws IOException {
-        Object result = TypeConverter.convertWithType(String.class, "hello", false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(String.class, "hello", false);
         assertEquals("hello", result);
     }
 
@@ -166,7 +169,7 @@ class TypeConverterDirectTest {
     void testHandleCollectionValueWithRawListField() throws Exception {
         // Raw List field (no parameterized type) — element type falls through to Object.
         java.lang.reflect.Field rawList = RawFieldFixture.class.getField("rawList");
-        Object result = TypeConverter.getConvertedValue(rawList, List.class, List.of("a", "b"), false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(rawList, List.class, List.of("a", "b"), false);
         assertEquals(List.of("a", "b"), result);
     }
 
@@ -176,7 +179,7 @@ class TypeConverterDirectTest {
         java.lang.reflect.Field rawMap = RawFieldFixture.class.getField("rawMap");
         Map<String, String> input = new LinkedHashMap<>();
         input.put("k", "v");
-        Object result = TypeConverter.getConvertedValue(rawMap, Map.class, input, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(rawMap, Map.class, input, false);
         assertEquals(input, result);
     }
 
@@ -286,7 +289,7 @@ class TypeConverterDirectTest {
         recordMap.put("zip_code", null); // int cannot be null
 
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, Address.class, recordMap, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, Address.class, recordMap, false));
         assertTrue(thrown.getMessage().contains("Cannot assign null to primitive record component 'zipCode'"));
     }
 
@@ -303,7 +306,7 @@ class TypeConverterDirectTest {
         recordMap.put("name", "Student");
         recordMap.put("scores", innerMap);
 
-        Object result = TypeConverter.getConvertedValue(null, RecordWithMap.class, recordMap, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, RecordWithMap.class, recordMap, false);
         assertInstanceOf(RecordWithMap.class, result);
         RecordWithMap converted = (RecordWithMap) result;
         assertEquals("Student", converted.name());
@@ -319,7 +322,7 @@ class TypeConverterDirectTest {
         recordMap.put("name", "Item");
         recordMap.put("tags", tags);
 
-        Object result = TypeConverter.getConvertedValue(null, RecordWithList.class, recordMap, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, RecordWithList.class, recordMap, false);
         assertInstanceOf(RecordWithList.class, result);
         RecordWithList converted = (RecordWithList) result;
         assertEquals("Item", converted.name());
@@ -332,34 +335,34 @@ class TypeConverterDirectTest {
     void testNumberToUnsupportedTypeThrows() {
         // Number value but expectedType is not a numeric type
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, UUID.class, 42, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, UUID.class, 42, false));
         assertTrue(thrown.getMessage().contains("Cannot convert Integer to UUID"));
     }
 
     @Test
     void testFloatConversionLenientAllowsPrecisionLoss() throws IOException {
         // Double that can't be exactly represented as float, but lenient mode allows it
-        Object result = TypeConverter.getConvertedValue(null, float.class, 1.234567890123, true, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, float.class, 1.234567890123, true);
         assertInstanceOf(Float.class, result);
     }
 
     @Test
     void testFloatConversionStrictRejectsPrecisionLoss() {
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, float.class, 1.234567890123, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, float.class, 1.234567890123, false));
         assertTrue(thrown.getMessage().contains("cannot be precisely represented as a float"));
     }
 
     @Test
     void testCharacterConversionLenientTakesFirstChar() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, char.class, "abc", true, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, char.class, "abc", true);
         assertEquals('a', result);
     }
 
     @Test
     void testCharacterConversionStrictRejectsMultiChar() {
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, char.class, "abc", false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, char.class, "abc", false));
         assertTrue(thrown.getMessage().contains("Cannot convert String of length 3 to Character"));
     }
 
@@ -368,37 +371,37 @@ class TypeConverterDirectTest {
     @Test
     void testDoubleToIntegerConversion() throws IOException {
         // Double value being converted to Integer.class → hits the Integer.class branch in convertToNumber
-        Object result = TypeConverter.getConvertedValue(null, Integer.class, 42.0, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Integer.class, 42.0, false);
         assertEquals(42, result);
     }
 
     @Test
     void testDoubleToLongConversion() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, Long.class, 42.0, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Long.class, 42.0, false);
         assertEquals(42L, result);
     }
 
     @Test
     void testDoubleToShortConversion() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, Short.class, 42.0, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Short.class, 42.0, false);
         assertEquals((short) 42, result);
     }
 
     @Test
     void testDoubleToByteConversion() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, Byte.class, 42.0, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Byte.class, 42.0, false);
         assertEquals((byte) 42, result);
     }
 
     @Test
     void testIntToDoubleConversion() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, Double.class, 42, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Double.class, 42, false);
         assertEquals(42.0, result);
     }
 
     @Test
     void testIntToFloatConversion() throws IOException {
-        Object result = TypeConverter.getConvertedValue(null, Float.class, 42, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Float.class, 42, false);
         assertEquals(42.0f, result);
     }
 
@@ -428,7 +431,7 @@ class TypeConverterDirectTest {
         mapValue.put("key1", 10);
         mapValue.put("key2", 20);
 
-        Object result = TypeConverter.convertWithType(mapType, mapValue, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(mapType, mapValue, false);
         assertInstanceOf(Map.class, result);
         Map<?, ?> resultMap = (Map<?, ?>) result;
         assertEquals(10, resultMap.get("key1"));
@@ -455,7 +458,7 @@ class TypeConverterDirectTest {
         };
 
         List<String> listValue = List.of("a", "b");
-        Object result = TypeConverter.convertWithType(listType, listValue, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(listType, listValue, false);
         assertInstanceOf(List.class, result);
         assertEquals(2, ((List<?>) result).size());
     }
@@ -485,7 +488,7 @@ class TypeConverterDirectTest {
         Map<String, Object> mapValue = new LinkedHashMap<>();
         mapValue.put("key", "value");
 
-        Object result = TypeConverter.convertWithType(rawMapType, mapValue, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(rawMapType, mapValue, false);
         assertInstanceOf(Map.class, result);
     }
 
@@ -509,7 +512,7 @@ class TypeConverterDirectTest {
         };
 
         List<String> listValue = List.of("a", "b");
-        Object result = TypeConverter.convertWithType(rawListType, listValue, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(rawListType, listValue, false);
         assertInstanceOf(List.class, result);
     }
 
@@ -536,7 +539,7 @@ class TypeConverterDirectTest {
         Map<String, Object> mapValue = new LinkedHashMap<>();
         mapValue.put("key", "value");
 
-        Object result = TypeConverter.convertWithType(singleArgMapType, mapValue, false, Naming.SNAKE_CASE);
+        Object result = converter.convertWithType(singleArgMapType, mapValue, false);
         assertInstanceOf(Map.class, result);
     }
 
@@ -550,7 +553,7 @@ class TypeConverterDirectTest {
         recordMap.put("value", -1);
 
         IOException thrown = assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, ValidatingRecord.class, recordMap, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, ValidatingRecord.class, recordMap, false));
         assertTrue(thrown.getMessage().contains("Failed to instantiate record ValidatingRecord"));
     }
 
@@ -566,7 +569,7 @@ class TypeConverterDirectTest {
         recordMap.put("zip_code", 12345);
 
         // String has a String(String) constructor, so Map.toString() will be used
-        Object result = TypeConverter.getConvertedValue(null, Address.class, recordMap, false, Naming.SNAKE_CASE);
+        Object result = converter.getConvertedValue(null, Address.class, recordMap, false);
         assertInstanceOf(Address.class, result);
         // The map's toString becomes the street value
         Address addr = (Address) result;
@@ -586,6 +589,6 @@ class TypeConverterDirectTest {
 
         // Falls through to else block, then getConvertedValue tries to create String collection → fails
         assertThrows(IOException.class, () ->
-                TypeConverter.getConvertedValue(null, Address.class, recordMap, false, Naming.SNAKE_CASE));
+                converter.getConvertedValue(null, Address.class, recordMap, false));
     }
 }
