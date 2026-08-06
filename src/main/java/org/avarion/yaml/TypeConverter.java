@@ -92,15 +92,15 @@ final class TypeConverter {
         }
 
         if (value instanceof List<?>) {
-            return handleCollectionValue(field, expectedType, (Collection<?>) value);
+            return convertCollection(expectedType, genericTypeOf(field), (Collection<?>) value);
         }
         if (Collection.class.isAssignableFrom(expectedType) && isLenient) {
             // We allow a single String/int/... to be assigned to a Collection -- but only when we're in lenient mode
-            return handleCollectionValue(field, expectedType, List.of(value));
+            return convertCollection(expectedType, genericTypeOf(field), List.of(value));
         }
 
         if (value instanceof Map && Map.class.isAssignableFrom(expectedType)) {
-            return handleMapValue(field, expectedType, (Map<?, ?>) value);
+            return convertMap(genericTypeOf(field), (Map<?, ?>) value);
         }
 
         if (expectedType.isInstance(value)) {
@@ -154,50 +154,11 @@ final class TypeConverter {
         if (value == null) {
             return handleNullValue(rawClass, null);
         }
-
-        // Handle Maps with type information (only if type is parameterized)
-        if (value instanceof Map && Map.class.isAssignableFrom(rawClass)) {
-            Map<Object, Object> result = new LinkedHashMap<>();
-
-            // Extract type arguments if this is a ParameterizedType
-            Type keyType = Object.class;
-            Type valueType = Object.class;
-            if (type instanceof ParameterizedType convertedType) {
-                Type[] typeArgs = convertedType.getActualTypeArguments();
-                if (typeArgs.length > 0) keyType = typeArgs[0];
-                if (typeArgs.length > 1) valueType = typeArgs[1];
-            }
-
-            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
-                Object convertedKey = convertWithType(keyType, entry.getKey());
-                Object convertedValue = convertWithType(valueType, entry.getValue());
-                if (convertedKey == LENIENT_ENUM_SKIP || convertedValue == LENIENT_ENUM_SKIP) {
-                    continue;
-                }
-                result.put(convertedKey, convertedValue);
-            }
-            return result;
+        if (value instanceof Map<?, ?> map && Map.class.isAssignableFrom(rawClass)) {
+            return convertMap(type, map);
         }
-
-        // Handle Collections with type information (only if type is parameterized)
-        if (value instanceof Collection && Collection.class.isAssignableFrom(rawClass)) {
-            Collection<Object> result = createCollectionInstance(rawClass);
-
-            // Extract element type if this is a ParameterizedType
-            Type elementType = Object.class;
-            if (type instanceof ParameterizedType convertedType) {
-                Type[] typeArgs = convertedType.getActualTypeArguments();
-                if (typeArgs.length > 0) elementType = typeArgs[0];
-            }
-
-            for (Object item : (Collection<?>) value) {
-                Object convertedItem = convertWithType(elementType, item);
-                if (convertedItem == LENIENT_ENUM_SKIP) {
-                    continue;
-                }
-                result.add(convertedItem);
-            }
-            return result;
+        if (value instanceof Collection<?> items && Collection.class.isAssignableFrom(rawClass)) {
+            return convertCollection(rawClass, type, items);
         }
 
         // For all other types (primitives, String, enums, UUID, numbers, chars, etc.),
@@ -205,27 +166,41 @@ final class TypeConverter {
         return getConvertedValue(null, rawClass, value);
     }
 
-    // ==================== Collection Handling ====================
+    // ==================== Collection & Map Handling ====================
 
     /**
-     * Convert the incoming value into a Set/List/Queue.
+     * The {@code index}-th type argument of a parameterized type, or {@code Object} when the type
+     * isn't parameterized (a raw Map/Collection, or a field we have no generic information for).
      */
-    private @NotNull Object handleCollectionValue(
-            final @Nullable Field field, final @NotNull Class<?> expectedType, final @NotNull Collection<?> collection) throws IOException {
-
-        Collection<Object> result = createCollectionInstance(expectedType);
-
-        // Extract element type from Field's generic type if available; raw Collection / null field falls through with Object.
-        Type elementType = field != null && field.getGenericType() instanceof ParameterizedType pt
-                ? pt.getActualTypeArguments()[0]
-                : Object.class;
-
-        for (Object item : collection) {
-            Object convertedValue = convertWithType(elementType, item);
-            if (convertedValue == LENIENT_ENUM_SKIP) {
-                continue;
+    private static @NotNull Type typeArgAt(final @Nullable Type type, final int index) {
+        if (type instanceof ParameterizedType pt) {
+            Type[] args = pt.getActualTypeArguments();
+            if (index < args.length) {
+                return args[index];
             }
-            result.add(convertedValue);
+        }
+        return Object.class;
+    }
+
+    /** The generic type of a field, or {@code null} when there is no field to read it from. */
+    private static @Nullable Type genericTypeOf(final @Nullable Field field) {
+        return field == null ? null : field.getGenericType();
+    }
+
+    /**
+     * Convert the incoming value into a Set/List/Queue, taking the element type from
+     * {@code genericType} and the concrete collection class from {@code targetType}.
+     */
+    private @NotNull Object convertCollection(final @NotNull Class<?> targetType, final @Nullable Type genericType, final @NotNull Collection<?> items)
+            throws IOException {
+        Collection<Object> result = createCollectionInstance(targetType);
+        Type elementType = typeArgAt(genericType, 0);
+
+        for (Object item : items) {
+            Object converted = convertWithType(elementType, item);
+            if (converted != LENIENT_ENUM_SKIP) {
+                result.add(converted);
+            }
         }
         return result;
     }
@@ -233,26 +208,17 @@ final class TypeConverter {
     /**
      * Convert the incoming value into a Map with properly typed keys and values.
      */
-    private @NotNull Object handleMapValue(final @NotNull Field field, final @NotNull Class<?> expectedType, final Map<?, ?> map) throws IOException {
-
+    private @NotNull Object convertMap(final @Nullable Type genericType, final @NotNull Map<?, ?> map) throws IOException {
         Map<Object, Object> result = new LinkedHashMap<>();
-
-        // Extract key/value types from Field's generic type if available; raw Map fields fall through with Object.
-        Type keyType = Object.class;
-        Type valueType = Object.class;
-        if (field.getGenericType() instanceof ParameterizedType pt) {
-            Type[] typeArgs = pt.getActualTypeArguments();
-            keyType = typeArgs[0];
-            valueType = typeArgs[1];
-        }
+        Type keyType = typeArgAt(genericType, 0);
+        Type valueType = typeArgAt(genericType, 1);
 
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             Object convertedKey = convertWithType(keyType, entry.getKey());
             Object convertedValue = convertWithType(valueType, entry.getValue());
-            if (convertedKey == LENIENT_ENUM_SKIP || convertedValue == LENIENT_ENUM_SKIP) {
-                continue;
+            if (convertedKey != LENIENT_ENUM_SKIP && convertedValue != LENIENT_ENUM_SKIP) {
+                result.put(convertedKey, convertedValue);
             }
-            result.put(convertedKey, convertedValue);
         }
         return result;
     }
@@ -282,36 +248,16 @@ final class TypeConverter {
 
         for (int i = 0; i < components.length; i++) {
             RecordComponent component = components[i];
-            String componentName = component.getName();
-            Class<?> componentType = component.getType();
-            Type genericType = component.getGenericType();
-
             Object value = map.get(RecordComponents.keyOf(component, naming));
 
-            if (value == null) {
-                // Handle null: primitives cannot be null
-                if (componentType.isPrimitive()) {
-                    throw new IOException("Cannot assign null to primitive record component '" + componentName +
-                            "' in record " + recordClass.getSimpleName());
-                }
-                args[i] = null;
+            if (value == null && component.getType().isPrimitive()) {
+                throw new IOException("Cannot assign null to primitive record component '" + component.getName() +
+                        "' in record " + recordClass.getSimpleName());
             }
-            else if (value instanceof Map && componentType.isRecord()) {
-                // Nested record: recursively convert
-                args[i] = convertMapToRecord(componentType, (Map<?, ?>) value);
-            }
-            else if (value instanceof Map && Map.class.isAssignableFrom(componentType)) {
-                // Map field within record: use convertWithType for proper type handling
-                args[i] = convertWithType(genericType, value);
-            }
-            else if (value instanceof Collection && Collection.class.isAssignableFrom(componentType)) {
-                // Collection field within record: use convertWithType for proper type handling
-                args[i] = convertWithType(genericType, value);
-            }
-            else {
-                // Regular field: use getConvertedValue for type coercion
-                args[i] = getConvertedValue(null, componentType, value);
-            }
+
+            // convertWithType already routes nested records, maps and collections by their generic
+            // type, so every non-null component takes the same road in.
+            args[i] = value == null ? null : convertWithType(component.getGenericType(), value);
 
             // A record component cannot be skipped, so a lenient enum-skip becomes null
             if (args[i] == LENIENT_ENUM_SKIP) {
