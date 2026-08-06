@@ -214,7 +214,6 @@ publishing {
 
 sonar {
     properties {
-        property "sonar.scm.disabled", "true"
         property "sonar.java.binaries", "${layout.buildDirectory.get()}/classes"
         property "sonar.sources", "src/main"
         property "sonar.tests", "src/test"
