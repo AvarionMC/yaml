@@ -12,7 +12,7 @@ import org.avarion.yaml.YamlKey;
 public class KeepNamingClass extends YamlFileInterface {
 
     @YamlKey
-    public NamingRecord derivedBlock = NamingRecord.sample();
+    public NamingRecord derivedBlock = new NamingRecord("a", "b", "c", "d", "e");
 
     @YamlKey("anExplicitFieldKey")
     public String explicitField = "kept";

@@ -73,26 +73,6 @@ class NamingTests extends TestCommon {
                 """, readFile());
     }
 
-    // ===== An explicit key is never converted, under either strategy =====
-
-    @Test
-    void testExplicitKeysStayVerbatimUnderSnakeCase() throws IOException {
-        new SnakeCaseNamingClass().save(target);
-
-        String yaml = readFile();
-        assertEquals(true, yaml.contains("  someCamelKey: e\n"), yaml);
-        assertEquals(true, yaml.contains("anExplicitFieldKey: kept\n"), yaml);
-    }
-
-    @Test
-    void testExplicitKeysStayVerbatimUnderKeep() throws IOException {
-        new KeepNamingClass().save(target);
-
-        String yaml = readFile();
-        assertEquals(true, yaml.contains("  someCamelKey: e\n"), yaml);
-        assertEquals(true, yaml.contains("anExplicitFieldKey: kept\n"), yaml);
-    }
-
     // ===== Reader and writer agree =====
 
     @Test

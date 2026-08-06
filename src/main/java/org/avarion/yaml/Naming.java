@@ -41,14 +41,6 @@ public enum Naming {
             return identifier;
         }
 
-        // Both patterns need an ASCII capital to fire, so an identifier already equal to its own
-        // lowercasing has no boundary to split on and is its own answer. Single-word names are the
-        // common case, and String#toLowerCase hands back the very same instance when no character
-        // changes, so this costs a reference comparison rather than two Matcher allocations.
-        if (identifier.toLowerCase(Locale.ENGLISH).equals(identifier)) {
-            return identifier;
-        }
-
         String separated = ACRONYM_BOUNDARY.matcher(identifier).replaceAll("$1_$2");
         separated = WORD_BOUNDARY.matcher(separated).replaceAll("$1_$2");
         return separated.toLowerCase(Locale.ENGLISH);

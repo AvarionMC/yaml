@@ -4,17 +4,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.RecordComponent;
-import java.util.Arrays;
 
 /**
  * Reads the YAML annotations off a record component.
- *
- * <p>{@link YamlKey} and {@link YamlComment} target fields, and the compiler propagates an
- * annotation written on a record component onto that component's backing private final field.
- * Reading the field is therefore the one lookup that works for every record, no matter which
- * release of this library it was compiled against.</p>
  */
 final class RecordComponents {
 
@@ -30,7 +23,7 @@ final class RecordComponents {
      *                     component cannot spread itself over a nested path.
      */
     static @NotNull String keyOf(final @NotNull RecordComponent component, final @NotNull Naming naming) throws IOException {
-        YamlKey annotation = annotationOn(component, YamlKey.class);
+        YamlKey annotation = component.getAnnotation(YamlKey.class);
         String key = annotation == null ? "" : annotation.value().trim();
 
         if (key.isEmpty()) {
@@ -48,15 +41,7 @@ final class RecordComponents {
      * The {@link YamlComment} text for a component, or {@code null} when it has none.
      */
     static @Nullable String commentOf(final @NotNull RecordComponent component) {
-        YamlComment annotation = annotationOn(component, YamlComment.class);
+        YamlComment annotation = component.getAnnotation(YamlComment.class);
         return annotation == null ? null : annotation.value();
-    }
-
-    private static <A extends Annotation> @Nullable A annotationOn(final @NotNull RecordComponent component, final @NotNull Class<A> annotationType) {
-        return Arrays.stream(component.getDeclaringRecord().getDeclaredFields())
-                     .filter(field -> field.getName().equals(component.getName()))
-                     .findFirst()
-                     .map(field -> field.getAnnotation(annotationType))
-                     .orElse(null);
     }
 }

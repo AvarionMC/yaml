@@ -16,8 +16,4 @@ public record NamingRecord(
         String name,
 
         @YamlKey("someCamelKey") String explicit) {
-
-    public static NamingRecord sample() {
-        return new NamingRecord("a", "b", "c", "d", "e");
-    }
 }
