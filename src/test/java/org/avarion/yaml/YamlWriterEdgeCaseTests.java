@@ -1,5 +1,6 @@
 package org.avarion.yaml;
 
+import org.avarion.yaml.testClasses.Address;
 import org.avarion.yaml.testClasses.EdgeCaseClass;
 import org.avarion.yaml.testClasses.StaticFieldTestClass;
 import org.junit.jupiter.api.Test;
@@ -125,6 +126,33 @@ class YamlWriterEdgeCaseTests extends TestCommon {
 
         // The normalization should handle empty sets
         assertDoesNotThrow(() -> config.save(target));
+    }
+
+    @Test
+    void testNormalizeCollectionWithNonComparableSet() throws IOException {
+        // Records don't implement Comparable, so normalizeCollection must skip the sort
+        // rather than blow up on the cast.
+        class NonComparableSetConfig extends YamlFileInterface {
+            @YamlKey("items")
+            public Set<Address> items = new LinkedHashSet<>();
+        }
+
+        NonComparableSetConfig config = new NonComparableSetConfig();
+        // Deliberately not in sorted order: if the sort ever ran, the output below would flip.
+        config.items.add(new Address("2 Second St", "Springfield", 22222));
+        config.items.add(new Address("1 First St", "Shelbyville", 11111));
+
+        config.save(target);
+
+        assertEquals("""
+                items:
+                  - street: 2 Second St
+                    city: Springfield
+                    zip_code: 22222
+                  - street: 1 First St
+                    city: Shelbyville
+                    zip_code: 11111
+                """, readFile());
     }
 
     enum TestEnum { VALUE_A, VALUE_B }

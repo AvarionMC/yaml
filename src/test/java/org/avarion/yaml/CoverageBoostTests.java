@@ -132,7 +132,8 @@ class CoverageBoostTests extends TestCommon {
         }
 
         NonComparableSetConfig config = new NonComparableSetConfig();
-        // UUIDs are Comparable, so let's use a List instead to verify the path
+        // UUID is Comparable, so this covers the sorting side of normalizeCollection.
+        // The non-Comparable side is covered by YamlWriterEdgeCaseTests.
         UUID uuid1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
         UUID uuid2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
         config.items.add(uuid1);
