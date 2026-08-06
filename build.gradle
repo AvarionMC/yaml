@@ -2,6 +2,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id "jacoco"
+    id "org.sonarqube" version "7.3.1.8318"
 }
 
 def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
@@ -208,5 +209,32 @@ publishing {
                 }
             }
         }
+    }
+}
+
+sonar {
+    properties {
+        // Single source of truth for the settings both analysers understand. SonarCloud's
+        // Automatic Analysis reads sonar-project.properties itself; the Gradle scanner does
+        // not read that file, so it is loaded in here.
+        def shared = new Properties()
+        project.file("sonar-project.properties").withInputStream { shared.load(it) }
+        shared.each { key, value -> property(key, value) }
+
+        // Scanner-only. Automatic Analysis never builds the project and gets its project
+        // identity from the SonarCloud binding, so none of these mean anything to it.
+        property "sonar.projectKey", "AvarionMC_yaml"
+        property "sonar.organization", "avarionmc"
+        property "sonar.host.url", "https://sonarcloud.io"
+        property "sonar.scm.disabled", "true"
+        property "sonar.verbose", "true"
+        property "sonar.java.binaries", "${layout.buildDirectory.get()}/classes"
+        property 'sonar.core.codeCoveragePlugin', 'jacoco'
+        property "sonar.coverage.jacoco.xmlReportPaths", [
+                "${layout.buildDirectory.get()}/reports/jacoco/report-1.14.xml",
+                "${layout.buildDirectory.get()}/reports/jacoco/report-1.33.xml",
+                "${layout.buildDirectory.get()}/reports/jacoco/report-2.2.xml",
+                "${layout.buildDirectory.get()}/reports/jacoco/report-2.4.xml"
+        ].join(',')
     }
 }
