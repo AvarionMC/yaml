@@ -23,7 +23,6 @@ import java.util.function.Consumer;
 public abstract class YamlFileInterface {
     static final Object UNKNOWN = new Object();
     private static final YamlWrapper yaml = YamlWrapperFactory.create();
-    private static final YamlWriter yamlWriter = new YamlWriter(yaml);
 
     // ==================== Load Methods ====================
 
@@ -58,7 +57,7 @@ public abstract class YamlFileInterface {
         boolean isLenientByDefault = yamlFileAnnotation == null || yamlFileAnnotation.lenient() != Leniency.STRICT;
 
         try {
-            loadFields(data, isLenientByDefault);
+            loadFields(data, isLenientByDefault, namingOf(yamlFileAnnotation));
         } catch (IllegalAccessException | IllegalArgumentException | NullPointerException | FinalAttribute e) {
             throw new IOException(e);
         }
@@ -219,7 +218,8 @@ public abstract class YamlFileInterface {
 
     // ==================== Field Processing ====================
 
-    private void loadFields(Map<String, Object> data, boolean isLenientByDefault) throws FinalAttribute, IllegalAccessException, IOException {
+    private void loadFields(Map<String, Object> data, boolean isLenientByDefault, @NotNull Naming naming)
+            throws FinalAttribute, IllegalAccessException, IOException {
         if (data == null) {
             data = new HashMap<>();
         }
@@ -228,25 +228,26 @@ public abstract class YamlFileInterface {
             for (Field field : clazz.getDeclaredFields()) {
                 YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
 
-                if (keyAnnotation != null && !keyAnnotation.value().trim().isEmpty()) {
-                    readYamlKeyField(data, field, keyAnnotation, isLenientByDefault);
+                if (keyAnnotation != null) {
+                    readYamlKeyField(data, field, keyAnnotation, isLenientByDefault, naming);
                 }
             }
         }
     }
 
-    private void readYamlKeyField(Map<String, Object> data, @NotNull Field field, @NotNull YamlKey annotation, boolean isLenientByDefault)
+    private void readYamlKeyField(
+            Map<String, Object> data, @NotNull Field field, @NotNull YamlKey annotation, boolean isLenientByDefault, @NotNull Naming naming)
             throws FinalAttribute, IllegalAccessException, IOException {
         if (Modifier.isFinal(field.getModifiers())) {
             throw new FinalAttribute(field.getName());
         }
 
-        String key = annotation.value();
+        String key = keyOf(field, annotation, naming);
         boolean isLenient = isLenient(annotation.lenient(), isLenientByDefault);
 
         Object value = getNestedValue(data, key.split("\\."));
         if (value != UNKNOWN) {
-            Object converted = TypeConverter.getConvertedValue(field, value, isLenient);
+            Object converted = TypeConverter.getConvertedValue(field, value, isLenient, naming);
             if (converted == TypeConverter.LENIENT_ENUM_SKIP) {
                 // Lenient mode: bad enum value at top level — leave field at its default
                 return;
@@ -271,11 +272,12 @@ public abstract class YamlFileInterface {
         }
 
         // Fields
+        Naming naming = namingOf(yamlFileAnnotation);
         NestedMap nestedMap = new NestedMap();
         for (Field field : clazz.getDeclaredFields()) {
             YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
 
-            if (keyAnnotation != null && !keyAnnotation.value().trim().isEmpty()) {
+            if (keyAnnotation != null) {
                 if (Modifier.isFinal(field.getModifiers())) {
                     throw new FinalAttribute(field.getName());
                 }
@@ -284,14 +286,28 @@ public abstract class YamlFileInterface {
                 Object value = field.get(this);
                 YamlComment comment = field.getAnnotation(YamlComment.class);
 
-                nestedMap.put(keyAnnotation.value(), comment == null ? null : comment.value(), value);
+                nestedMap.put(keyOf(field, keyAnnotation, naming), comment == null ? null : comment.value(), value);
             }
         }
 
         // Convert the nested map to YAML using YamlWriter
-        result.append(yamlWriter.write(nestedMap.getMap()));
+        result.append(new YamlWriter(yaml, naming).write(nestedMap.getMap()));
 
         return result.toString();
+    }
+
+    /**
+     * The YAML key for a field: its {@link YamlKey} when one is spelled out, otherwise the
+     * field's own name run through the naming strategy.
+     */
+    private static @NotNull String keyOf(final @NotNull Field field, final @NotNull YamlKey annotation, final @NotNull Naming naming) {
+        String key = annotation.value().trim();
+        return key.isEmpty() ? naming.convert(field.getName()) : key;
+    }
+
+    /** The naming strategy of a config class, falling back to the annotation's own default. */
+    private static @NotNull Naming namingOf(final @Nullable YamlFile annotation) {
+        return annotation == null ? Naming.SNAKE_CASE : annotation.naming();
     }
 
     private void appendHeaderComment(StringBuilder result, String header) {

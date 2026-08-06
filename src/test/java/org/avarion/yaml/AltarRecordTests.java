@@ -87,7 +87,7 @@ class AltarRecordTests extends TestCommon {
         assertTrue(yaml.contains("blood:"), "Should have blood altar");
         assertTrue(yaml.contains("light:"), "Should have light altar");
         assertTrue(yaml.contains("name:"), "Should have name field");
-        assertTrue(yaml.contains("displayName:"), "Should have displayName field");
+        assertTrue(yaml.contains("display_name:"), "Should have display_name field");
         assertTrue(yaml.contains("lore:"), "Should have lore field");
         assertTrue(yaml.contains("material:"), "Should have material field");
         assertTrue(yaml.contains("ingredients:"), "Should have ingredients field");
@@ -102,14 +102,14 @@ class AltarRecordTests extends TestCommon {
                 altars:
                   blood:
                     name: blood
-                    displayName: '&4Blood Altar'
+                    display_name: '&4Blood Altar'
                     lore:
                       - '&7A dark altar'
                       - '&7for blood rituals'
                     material: ENCHANTING_TABLE
-                    modelId: 1001
-                    targetItemName: blood_essence
-                    targetItemAmount: 1
+                    model_id: 1001
+                    target_item_name: blood_essence
+                    target_item_amount: 1
                     ingredients:
                       REDSTONE: 16
                       GHAST_TEAR: 1

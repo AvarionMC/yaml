@@ -1,11 +1,16 @@
 package org.avarion.yaml.testClasses;
 
+import org.avarion.yaml.Naming;
+import org.avarion.yaml.YamlFile;
 import org.avarion.yaml.YamlFileInterface;
 import org.avarion.yaml.YamlKey;
 
 /**
  * Test class for simple record field serialization/deserialization.
+ * Pinned to {@link Naming#KEEP} so it keeps guarding the pre-naming-strategy spelling
+ * ({@code zipCode} rather than {@code zip_code}).
  */
+@YamlFile(naming = Naming.KEEP)
 public class SimpleRecordClass extends YamlFileInterface {
 
     @YamlKey("address")

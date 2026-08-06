@@ -27,4 +27,10 @@ public @interface YamlFile {
 	@NotNull String header() default "";
     Leniency lenient() default Leniency.LENIENT;
     @NotNull String fileName() default "config.yml";
+
+    /**
+     * How keys that have to be derived from a Java identifier are spelled.
+     * An explicit {@code @YamlKey("...")} is never converted.
+     */
+    @NotNull Naming naming() default Naming.SNAKE_CASE;
 }
