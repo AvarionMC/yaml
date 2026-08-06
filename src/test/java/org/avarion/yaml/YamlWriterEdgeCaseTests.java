@@ -1,5 +1,6 @@
 package org.avarion.yaml;
 
+import org.avarion.yaml.testClasses.Address;
 import org.avarion.yaml.testClasses.EdgeCaseClass;
 import org.avarion.yaml.testClasses.StaticFieldTestClass;
 import org.junit.jupiter.api.Test;
@@ -128,24 +129,30 @@ class YamlWriterEdgeCaseTests extends TestCommon {
     }
 
     @Test
-    void testNormalizeCollectionWithNonComparableSet() {
-        // Create a set with non-comparable objects
-        class NonComparable {
-            final String value;
-            NonComparable(String value) { this.value = value; }
+    void testNormalizeCollectionWithNonComparableSet() throws IOException {
+        // Records don't implement Comparable, so normalizeCollection must skip the sort
+        // rather than blow up on the cast.
+        class NonComparableSetConfig extends YamlFileInterface {
+            @YamlKey("items")
+            public Set<Address> items = new LinkedHashSet<>();
         }
 
-        // This tests the path where Set elements are not Comparable
-        Set<NonComparable> nonComparableSet = new LinkedHashSet<>();
-        nonComparableSet.add(new NonComparable("a"));
-        nonComparableSet.add(new NonComparable("b"));
+        NonComparableSetConfig config = new NonComparableSetConfig();
+        // Deliberately not in sorted order: if the sort ever ran, the output below would flip.
+        config.items.add(new Address("2 Second St", "Springfield", 22222));
+        config.items.add(new Address("1 First St", "Shelbyville", 11111));
 
-        // Should not throw when normalizing non-comparable set
-        // (The normalizeCollection should just convert to ArrayList without sorting)
-        assertDoesNotThrow(() -> {
-            List<?> normalized = new ArrayList<>(nonComparableSet);
-            assertEquals(2, normalized.size());
-        });
+        config.save(target);
+
+        assertEquals("""
+                items:
+                  - street: 2 Second St
+                    city: Springfield
+                    zip_code: 22222
+                  - street: 1 First St
+                    city: Shelbyville
+                    zip_code: 11111
+                """, readFile());
     }
 
     enum TestEnum { VALUE_A, VALUE_B }

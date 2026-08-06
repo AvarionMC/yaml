@@ -271,7 +271,7 @@ class YamlWriter {
         }
 
         for (String line : comment.split("\\r?\\n")) {
-            yaml.append(indent).append("# ").append(line.replaceAll("\\s*$", "")).append("\n");
+            yaml.append(indent).append("# ").append(line.stripTrailing()).append("\n");
         }
     }
 }
