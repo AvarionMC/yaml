@@ -1,0 +1,43 @@
+name: Publish docs to wiki
+
+# The wiki mirrors docs/ as of the released tag, so readers never see documentation
+# for something that isn't out yet.
+on:
+  release:
+    types: [ published ]
+
+permissions:
+  contents: write
+
+jobs:
+  wiki:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Mirror docs into the wiki
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 "https://x-access-token:$TOKEN@github.com/${{ github.repository }}.wiki.git" wiki
+
+          # A mirror, not a merge: pages edited by hand in the wiki are replaced on every release.
+          rm -f wiki/*.md
+          cp docs/*.md wiki/
+          cp README.md wiki/Home.md
+
+          # Wiki pages are addressed by bare name, so strip the docs/ prefix and the .md extension.
+          # Same-page anchors like ](#naming-strategy) have no .md and are left alone.
+          sed -i -E 's@\]\((docs/)?([a-z-]+)\.md(#[^)]*)?\)@](\2\3)@g' wiki/*.md
+
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "docs: sync from $TAG"
+          git push
