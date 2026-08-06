@@ -214,21 +214,21 @@ publishing {
 
 sonar {
     properties {
-        // Single source of truth for the settings both analysers understand. SonarCloud's
-        // Automatic Analysis reads sonar-project.properties itself; the Gradle scanner does
-        // not read that file, so it is loaded in here.
-        def shared = new Properties()
-        project.file("sonar-project.properties").withInputStream { shared.load(it) }
-        shared.each { key, value -> property(key, value) }
+        property "sonar.scm.disabled", "true"
+        property "sonar.java.binaries", "${layout.buildDirectory.get()}/classes"
+        property "sonar.sources", "src/main"
+        property "sonar.tests", "src/test"
+        property "sonar.verbose", "true"
 
-        // Scanner-only. Automatic Analysis never builds the project and gets its project
-        // identity from the SonarCloud binding, so none of these mean anything to it.
+        // v1/v2 YamlWrapperImpl are identical on purpose: each version source set compiles
+        // against its own SnakeYAML major release, and the real API difference between them
+        // lives in ToStringRepresenter. Sharing the wrapper would force the common source set
+        // to compile against one pinned SnakeYAML and run against the other.
+        property "sonar.cpd.exclusions", "**/YamlWrapperImpl.java"
+
         property "sonar.projectKey", "AvarionMC_yaml"
         property "sonar.organization", "avarionmc"
         property "sonar.host.url", "https://sonarcloud.io"
-        property "sonar.scm.disabled", "true"
-        property "sonar.verbose", "true"
-        property "sonar.java.binaries", "${layout.buildDirectory.get()}/classes"
         property 'sonar.core.codeCoveragePlugin', 'jacoco'
         property "sonar.coverage.jacoco.xmlReportPaths", [
                 "${layout.buildDirectory.get()}/reports/jacoco/report-1.14.xml",
