@@ -2,6 +2,7 @@ package org.avarion.yaml;
 
 import org.avarion.yaml.testClasses.Address;
 import org.avarion.yaml.testClasses.Material;
+import org.avarion.yaml.testClasses.Sounds;
 import org.avarion.yaml.testClasses.ValidatingRecord;
 import org.junit.jupiter.api.Test;
 
@@ -66,13 +67,24 @@ class TypeConverterDirectTest {
         assertTrue(thrown.getMessage().contains("Cannot convert Integer to Material"));
     }
 
+    // ==================== what the failure message says ====================
+
+    @Test
+    void aFailureNamesTheValueAndGuessesWhatWasMeant() {
+        IOException thrown = assertThrows(IOException.class, () ->
+                strict.getConvertedValue(null, Sounds.class, "bumba"));
+
+        assertEquals("Cannot read Sounds from 'bumba': no constructor taking a String, and no constant with that name. "
+                + "Did you mean YOUR_SOUND_ROCKS_TOO, MY_SOUND_ROCKS?", thrown.getMessage());
+    }
+
     @Test
     void testMapValueWithNonMapExpectedType() {
         // value is Map but expectedType is not Map and not Record → falls through to constructor/field attempts
         Map<String, Object> mapValue = Map.of("key", "value");
         IOException thrown = assertThrows(IOException.class, () ->
                 strict.getConvertedValue(null, Integer.class, mapValue));
-        assertTrue(thrown.getMessage().contains("I cannot figure out how to retrieve this type"));
+        assertTrue(thrown.getMessage().contains("Cannot read Integer from '{key=value}'"));
     }
 
     @Test
@@ -109,7 +121,7 @@ class TypeConverterDirectTest {
         // Single String value, Collection expectedType, but NOT lenient → should fall through
         IOException thrown = assertThrows(IOException.class, () ->
                 strict.getConvertedValue(null, List.class, "single"));
-        assertTrue(thrown.getMessage().contains("I cannot figure out how to retrieve this type"));
+        assertTrue(thrown.getMessage().contains("Cannot read List from 'single'"));
     }
 
     @Test

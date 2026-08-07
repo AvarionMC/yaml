@@ -22,6 +22,9 @@ final class TypeConverter {
 
     static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
+    /** How many guesses an error offers. Enough to cover a near-miss, few enough to read. */
+    private static final int SUGGESTIONS = 3;
+
     /**
      * Per-thread sink for lenient warnings, unset unless a caller installs one.
      * {@link YamlFileInterface#load(Object)} installs the plugin's logger for the duration
@@ -152,7 +155,56 @@ final class TypeConverter {
         } catch (IllegalAccessException | NoSuchFieldException ignored) {
         }
 
-        throw new IOException("'" + expectedType.getSimpleName() + "': I cannot figure out how to retrieve this type.");
+        throw new IOException(cannotRead(expectedType, value));
+    }
+
+    /**
+     * Why {@code value} could not become an {@code expectedType}, written in terms
+     * of the value rather than the type.
+     * <p>
+     * The two routes tried just above are the whole of what this fallthrough
+     * knows how to do, so saying which ones failed is saying what to change: give
+     * the class a {@code String} constructor, or spell the constant the way the
+     * class does. Naming the offending value matters most of all — a config file
+     * is a list of values, and an error that names only the type leaves the
+     * reader to guess which line it meant.
+     * <p>
+     * For a constant holder (a registry-style class of {@code public static
+     * final} instances of itself) the nearest few spellings are offered, which
+     * turns "wrong" into "wrong, try one of these". The nearest few rather than
+     * all of them on purpose: it reads the same whether the class holds two
+     * constants or the fifteen hundred in Bukkit's Sound, so there is no size at
+     * which the message either stops helping or has to start truncating.
+     */
+    private static @NotNull String cannotRead(final @NotNull Class<?> expectedType, final @NotNull Object value) {
+        String message = "Cannot read %s from '%s': no constructor taking a String, and no constant with that name."
+                .formatted(expectedType.getSimpleName(), value);
+
+        List<String> guesses = nearestConstants(expectedType, value.toString());
+        return guesses.isEmpty() ? message : message + " Did you mean " + String.join(", ", guesses) + "?";
+    }
+
+    /**
+     * The spellings {@link #getFieldValue} would have accepted, nearest first:
+     * this type's own public static constants, ranked by how much they look like
+     * what was actually written.
+     * <p>
+     * Ties break alphabetically rather than on field order, so the same typo
+     * always draws the same answer — a suggestion that moves around between runs
+     * reads as a guess rather than as help.
+     */
+    private static @NotNull List<String> nearestConstants(final @NotNull Class<?> expectedType,
+                                                          final @NotNull String written) {
+        return Arrays.stream(expectedType.getDeclaredFields())
+                     .filter(field -> Modifier.isPublic(field.getModifiers()))
+                     .filter(field -> Modifier.isStatic(field.getModifiers()))
+                     .filter(field -> expectedType.isAssignableFrom(field.getType()))
+                     .map(Field::getName)
+                     .sorted(Comparator.comparingDouble((String name) -> Similarity.jaroWinkler(written, name))
+                                       .reversed()
+                                       .thenComparing(Comparator.naturalOrder()))
+                     .limit(SUGGESTIONS)
+                     .toList();
     }
 
     /**
