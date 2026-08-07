@@ -438,7 +438,7 @@ class YamlFileInterfaceTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new CustomNonStringYml().load(target.toString());
         });
-        assertEquals("Cannot read CustomNonStringAcceptingClass from '456': "
+        assertEquals("key: Cannot read CustomNonStringAcceptingClass from '456': "
                 + "no constructor taking a String, and no constant with that name.", thrown.getMessage());
     }
 
@@ -449,7 +449,7 @@ class YamlFileInterfaceTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new Primitive().load(target.toString());
         });
-        assertEquals("Unsupported collection type: char", thrown.getMessage());
+        assertEquals("char: Unsupported collection type: char", thrown.getMessage());
     }
 
     @Test
@@ -494,8 +494,8 @@ class YamlFileInterfaceTest extends TestCommon {
                     new SoundsConfig().load(target);
                 }
         );
-        assertEquals("Cannot read Sounds from 'bumba': no constructor taking a String, and no constant with that name. "
-                + "Available: MY_SOUND_ROCKS, YOUR_SOUND_ROCKS_TOO", thrown.getMessage());
+        assertEquals("name: Cannot read Sounds from 'bumba': no constructor taking a String, and no constant with that name. "
+                + "Did you mean YOUR_SOUND_ROCKS_TOO, MY_SOUND_ROCKS?", thrown.getMessage());
     }
 
     @Test

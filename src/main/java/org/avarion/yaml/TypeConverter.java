@@ -22,16 +22,8 @@ final class TypeConverter {
 
     static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
-    /**
-     * How many accepted spellings an error may list before it stops helping.
-     * <p>
-     * Set above the size of a registry someone would plausibly mistype a value
-     * from — Bukkit's Enchantment is around forty-five, and listing those is the
-     * difference between "wrong" and "wrong, try one of these". Well below
-     * Bukkit's Sound, which runs to four figures and would scroll the thing it
-     * was reporting off the top of the console.
-     */
-    private static final int MAX_CONSTANTS_LISTED = 100;
+    /** How many guesses an error offers. Enough to cover a near-miss, few enough to read. */
+    private static final int SUGGESTIONS = 3;
 
     /**
      * Per-thread sink for lenient warnings, unset unless a caller installs one.
@@ -178,34 +170,40 @@ final class TypeConverter {
      * reader to guess which line it meant.
      * <p>
      * For a constant holder (a registry-style class of {@code public static
-     * final} instances of itself) the accepted spellings are listed, since that
-     * turns "wrong" into "wrong, try one of these". Long registries are counted
-     * instead: a wall of a thousand names buries the error it came with.
+     * final} instances of itself) the nearest few spellings are offered, which
+     * turns "wrong" into "wrong, try one of these". The nearest few rather than
+     * all of them on purpose: it reads the same whether the class holds two
+     * constants or the fifteen hundred in Bukkit's Sound, so there is no size at
+     * which the message either stops helping or has to start truncating.
      */
     private static @NotNull String cannotRead(final @NotNull Class<?> expectedType, final @NotNull Object value) {
         String message = "Cannot read %s from '%s': no constructor taking a String, and no constant with that name."
                 .formatted(expectedType.getSimpleName(), value);
 
-        List<String> constants = constantNames(expectedType);
-        if (constants.isEmpty()) return message;
-        if (constants.size() > MAX_CONSTANTS_LISTED) {
-            return message + " %s has %d constants, none of them that.".formatted(expectedType.getSimpleName(),
-                    constants.size());
-        }
-        return message + " Available: " + String.join(", ", constants);
+        List<String> guesses = nearestConstants(expectedType, value.toString());
+        return guesses.isEmpty() ? message : message + " Did you mean " + String.join(", ", guesses) + "?";
     }
 
     /**
-     * The spellings {@link #getFieldValue} would have accepted: this type's own
-     * public static constants, sorted so the list reads the same every time.
+     * The spellings {@link #getFieldValue} would have accepted, nearest first:
+     * this type's own public static constants, ranked by how much they look like
+     * what was actually written.
+     * <p>
+     * Ties break alphabetically rather than on field order, so the same typo
+     * always draws the same answer — a suggestion that moves around between runs
+     * reads as a guess rather than as help.
      */
-    private static @NotNull List<String> constantNames(final @NotNull Class<?> expectedType) {
+    private static @NotNull List<String> nearestConstants(final @NotNull Class<?> expectedType,
+                                                          final @NotNull String written) {
         return Arrays.stream(expectedType.getDeclaredFields())
                      .filter(field -> Modifier.isPublic(field.getModifiers()))
                      .filter(field -> Modifier.isStatic(field.getModifiers()))
                      .filter(field -> expectedType.isAssignableFrom(field.getType()))
                      .map(Field::getName)
-                     .sorted()
+                     .sorted(Comparator.comparingDouble((String name) -> Similarity.jaroWinkler(written, name))
+                                       .reversed()
+                                       .thenComparing(Comparator.naturalOrder()))
+                     .limit(SUGGESTIONS)
                      .toList();
     }
 

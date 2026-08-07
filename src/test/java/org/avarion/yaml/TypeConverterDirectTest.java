@@ -1,7 +1,6 @@
 package org.avarion.yaml;
 
 import org.avarion.yaml.testClasses.Address;
-import org.avarion.yaml.testClasses.BigRegistry;
 import org.avarion.yaml.testClasses.Material;
 import org.avarion.yaml.testClasses.Sounds;
 import org.avarion.yaml.testClasses.ValidatingRecord;
@@ -71,22 +70,12 @@ class TypeConverterDirectTest {
     // ==================== what the failure message says ====================
 
     @Test
-    void aFailureNamesTheValueAndTheSpellingsItWouldHaveTaken() {
+    void aFailureNamesTheValueAndGuessesWhatWasMeant() {
         IOException thrown = assertThrows(IOException.class, () ->
                 strict.getConvertedValue(null, Sounds.class, "bumba"));
 
         assertEquals("Cannot read Sounds from 'bumba': no constructor taking a String, and no constant with that name. "
-                + "Available: MY_SOUND_ROCKS, YOUR_SOUND_ROCKS_TOO", thrown.getMessage());
-    }
-
-    @Test
-    void aRegistryTooBigToListIsCountedInstead() {
-        IOException thrown = assertThrows(IOException.class, () ->
-                strict.getConvertedValue(null, BigRegistry.class, "nope"));
-
-        assertTrue(thrown.getMessage().endsWith("BigRegistry has 101 constants, none of them that."),
-                thrown.getMessage());
-        assertFalse(thrown.getMessage().contains("C001"), "a wall of names buries the error it came with");
+                + "Did you mean YOUR_SOUND_ROCKS_TOO, MY_SOUND_ROCKS?", thrown.getMessage());
     }
 
     @Test

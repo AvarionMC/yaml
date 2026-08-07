@@ -47,7 +47,7 @@ class LeniencyTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new TestClass().load(target);
         });
-        assertEquals("Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
+        assertEquals("float: Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
     }
 
     @Test
@@ -123,7 +123,7 @@ class LeniencyTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new TestClass().load(target);
         });
-        assertEquals("Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
+        assertEquals("float: Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
     }
 
     @Test
@@ -170,7 +170,7 @@ class LeniencyTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new TestClass().load(target);
         });
-        assertEquals("Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
+        assertEquals("float: Double value 0.51 cannot be precisely represented as a float", thrown.getMessage());
     }
 
     @Test
@@ -204,7 +204,8 @@ class LeniencyTest extends TestCommon {
                     new TestClass().load(target);
                 }
         );
-        assertEquals("Cannot read List from 'Entry': no constructor taking a String, and no constant with that name.",
+        assertEquals("achievements: Cannot read List from 'Entry': "
+                + "no constructor taking a String, and no constant with that name.",
                 thrown.getMessage());
     }
 

@@ -247,13 +247,32 @@ public abstract class YamlFileInterface {
 
         Object value = getNestedValue(data, key.split("\\."));
         if (value != UNKNOWN) {
-            Object converted = new TypeConverter(naming, isLenient).getConvertedValue(field, value);
+            Object converted = convert(key, field, value, naming, isLenient);
             if (converted == TypeConverter.LENIENT_ENUM_SKIP) {
                 // Lenient mode: bad enum value at top level — leave field at its default
                 return;
             }
             field.setAccessible(true);
             field.set(this, converted);
+        }
+    }
+
+    /**
+     * Converts one field's value, with the key it was read from in front of
+     * anything that goes wrong.
+     * <p>
+     * The converter is handed a {@link Field}, whose name is the Java one — the
+     * reader is looking at a yaml file and needs the yaml one. This is the only
+     * place a conversion is started, and the only one where both are in scope.
+     */
+    private static Object convert(
+            @NotNull String key, @NotNull Field field, @NotNull Object value, @NotNull Naming naming, boolean isLenient)
+            throws IOException {
+        try {
+            return new TypeConverter(naming, isLenient).getConvertedValue(field, value);
+        }
+        catch (IOException e) {
+            throw new IOException(key + ": " + e.getMessage(), e);
         }
     }
 
