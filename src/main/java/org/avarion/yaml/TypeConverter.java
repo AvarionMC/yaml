@@ -23,6 +23,17 @@ final class TypeConverter {
     static final Logger LOG = Logger.getLogger(TypeConverter.class.getName());
 
     /**
+     * How many accepted spellings an error may list before it stops helping.
+     * <p>
+     * Set above the size of a registry someone would plausibly mistype a value
+     * from — Bukkit's Enchantment is around forty-five, and listing those is the
+     * difference between "wrong" and "wrong, try one of these". Well below
+     * Bukkit's Sound, which runs to four figures and would scroll the thing it
+     * was reporting off the top of the console.
+     */
+    private static final int MAX_CONSTANTS_LISTED = 100;
+
+    /**
      * Per-thread sink for lenient warnings, unset unless a caller installs one.
      * {@link YamlFileInterface#load(Object)} installs the plugin's logger for the duration
      * of the load, then restores what was there before.
@@ -152,7 +163,50 @@ final class TypeConverter {
         } catch (IllegalAccessException | NoSuchFieldException ignored) {
         }
 
-        throw new IOException("'" + expectedType.getSimpleName() + "': I cannot figure out how to retrieve this type.");
+        throw new IOException(cannotRead(expectedType, value));
+    }
+
+    /**
+     * Why {@code value} could not become an {@code expectedType}, written in terms
+     * of the value rather than the type.
+     * <p>
+     * The two routes tried just above are the whole of what this fallthrough
+     * knows how to do, so saying which ones failed is saying what to change: give
+     * the class a {@code String} constructor, or spell the constant the way the
+     * class does. Naming the offending value matters most of all — a config file
+     * is a list of values, and an error that names only the type leaves the
+     * reader to guess which line it meant.
+     * <p>
+     * For a constant holder (a registry-style class of {@code public static
+     * final} instances of itself) the accepted spellings are listed, since that
+     * turns "wrong" into "wrong, try one of these". Long registries are counted
+     * instead: a wall of a thousand names buries the error it came with.
+     */
+    private static @NotNull String cannotRead(final @NotNull Class<?> expectedType, final @NotNull Object value) {
+        String message = "Cannot read %s from '%s': no constructor taking a String, and no constant with that name."
+                .formatted(expectedType.getSimpleName(), value);
+
+        List<String> constants = constantNames(expectedType);
+        if (constants.isEmpty()) return message;
+        if (constants.size() > MAX_CONSTANTS_LISTED) {
+            return message + " %s has %d constants, none of them that.".formatted(expectedType.getSimpleName(),
+                    constants.size());
+        }
+        return message + " Available: " + String.join(", ", constants);
+    }
+
+    /**
+     * The spellings {@link #getFieldValue} would have accepted: this type's own
+     * public static constants, sorted so the list reads the same every time.
+     */
+    private static @NotNull List<String> constantNames(final @NotNull Class<?> expectedType) {
+        return Arrays.stream(expectedType.getDeclaredFields())
+                     .filter(field -> Modifier.isPublic(field.getModifiers()))
+                     .filter(field -> Modifier.isStatic(field.getModifiers()))
+                     .filter(field -> expectedType.isAssignableFrom(field.getType()))
+                     .map(Field::getName)
+                     .sorted()
+                     .toList();
     }
 
     /**

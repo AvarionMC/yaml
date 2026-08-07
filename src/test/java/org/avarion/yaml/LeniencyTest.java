@@ -204,7 +204,8 @@ class LeniencyTest extends TestCommon {
                     new TestClass().load(target);
                 }
         );
-        assertEquals("'List': I cannot figure out how to retrieve this type.", thrown.getMessage());
+        assertEquals("Cannot read List from 'Entry': no constructor taking a String, and no constant with that name.",
+                thrown.getMessage());
     }
 
     // ==================== Lenient enum-skipping in collections/maps (issue #124) ====================

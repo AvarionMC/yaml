@@ -438,7 +438,8 @@ class YamlFileInterfaceTest extends TestCommon {
         IOException thrown = assertThrows(IOException.class, () -> {
             new CustomNonStringYml().load(target.toString());
         });
-        assertEquals("'CustomNonStringAcceptingClass': I cannot figure out how to retrieve this type.", thrown.getMessage());
+        assertEquals("Cannot read CustomNonStringAcceptingClass from '456': "
+                + "no constructor taking a String, and no constant with that name.", thrown.getMessage());
     }
 
     @Test
@@ -493,7 +494,8 @@ class YamlFileInterfaceTest extends TestCommon {
                     new SoundsConfig().load(target);
                 }
         );
-        assertEquals("'Sounds': I cannot figure out how to retrieve this type.", thrown.getMessage());
+        assertEquals("Cannot read Sounds from 'bumba': no constructor taking a String, and no constant with that name. "
+                + "Available: MY_SOUND_ROCKS, YOUR_SOUND_ROCKS_TOO", thrown.getMessage());
     }
 
     @Test
