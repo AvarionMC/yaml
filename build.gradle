@@ -2,7 +2,7 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id "jacoco"
-    id "org.sonarqube" version "7.3.1.8318"
+    id "org.sonarqube" version "7.4.0.8496"
 }
 
 def snakeYamlVersion = project.findProperty('snakeYamlVersion') ?: '1.14'
