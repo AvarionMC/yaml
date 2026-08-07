@@ -45,37 +45,70 @@ final class Similarity {
     private static double jaro(final @NotNull String a, final @NotNull String b) {
         if (a.isEmpty() || b.isEmpty()) return a.isEmpty() && b.isEmpty() ? 1 : 0;
 
+        boolean[] usedInA = new boolean[a.length()];
+        boolean[] usedInB = new boolean[b.length()];
+
+        double matches = pairUp(a, b, usedInA, usedInB);
+        if (matches == 0) return 0;
+
+        double swapped = transpositions(a, b, usedInA, usedInB) / 2.0;
+        return (matches / a.length() + matches / b.length() + (matches - swapped) / matches) / 3.0;
+    }
+
+    /**
+     * Pairs each character of {@code a} with an unclaimed equal character of
+     * {@code b}, marking both, and answers how many pairs were made.
+     */
+    private static int pairUp(final @NotNull String a, final @NotNull String b,
+                              final boolean @NotNull [] usedInA, final boolean @NotNull [] usedInB) {
         // Two characters count as the same one only if they are near enough to
         // have been the same one - half the longer string, give or take.
         int window = Math.max(0, Math.max(a.length(), b.length()) / 2 - 1);
-
-        boolean[] usedInA = new boolean[a.length()];
-        boolean[] usedInB = new boolean[b.length()];
         int matches = 0;
 
         for (int i = 0; i < a.length(); i++) {
-            for (int j = Math.max(0, i - window); j < Math.min(b.length(), i + window + 1); j++) {
-                if (usedInB[j] || a.charAt(i) != b.charAt(j)) continue;
+            int found = claim(a.charAt(i), b, usedInB, Math.max(0, i - window), Math.min(b.length(), i + window + 1));
+            if (found >= 0) {
                 usedInA[i] = true;
-                usedInB[j] = true;
                 matches++;
-                break;
             }
         }
-        if (matches == 0) return 0;
+        return matches;
+    }
 
-        // Matched characters read off in order; every pair that disagrees is half
-        // a transposition, because it takes two to swap.
+    /**
+     * The first unclaimed {@code wanted} in {@code b} between {@code from} and
+     * {@code to}, marked as claimed — or {@code -1} if there is none. Claimed on
+     * the spot rather than by the caller, so one character of the other string
+     * cannot be spent twice.
+     */
+    private static int claim(final char wanted, final @NotNull String b, final boolean @NotNull [] usedInB,
+                             final int from, final int to) {
+        for (int j = from; j < to; j++) {
+            if (!usedInB[j] && b.charAt(j) == wanted) {
+                usedInB[j] = true;
+                return j;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * How many of the paired-up characters disagree when both strings are read
+     * off in order. Every disagreement is half a swap, because it takes two.
+     */
+    private static int transpositions(final @NotNull String a, final @NotNull String b,
+                                      final boolean @NotNull [] usedInA, final boolean @NotNull [] usedInB) {
         int transpositions = 0;
         int k = 0;
-        for (int i = 0; i < a.length(); i++) {
-            if (!usedInA[i]) continue;
-            while (!usedInB[k]) k++;
-            if (a.charAt(i) != b.charAt(k)) transpositions++;
-            k++;
-        }
 
-        double m = matches;
-        return (m / a.length() + m / b.length() + (m - transpositions / 2.0) / m) / 3.0;
+        for (int i = 0; i < a.length(); i++) {
+            if (usedInA[i]) {
+                while (!usedInB[k]) k++;
+                if (a.charAt(i) != b.charAt(k)) transpositions++;
+                k++;
+            }
+        }
+        return transpositions;
     }
 }
