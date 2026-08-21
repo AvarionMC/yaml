@@ -303,6 +303,37 @@ Settings settings = new Settings().load(file);
 settings.renamesApplied();   // {mysql=database.mysql}
 ```
 
+### When the name stayed and the value moved on
+
+A rename is about a key. The mirror problem is about a value: a file beats the compile-time
+default for every key it has, which is what an operator's choice should do — and is also why a
+default that *improves* between releases never reaches anybody whose file already mentions it.
+
+Deciding whether a given line is a considered choice or an untouched copy of an older default
+needs to know what that older default was, and only the caller can know that. Acting on the
+answer is `load(File, Set<String>)`:
+
+```java
+Settings settings = new Settings().load(file, Set.of("loot.tier-items"));
+```
+
+An ignored key is not read, so the field keeps what it already holds — for a freshly built
+configuration object, this release's default. A following `save` writes that out, because it is
+what the field now says.
+
+Name keys the way their fields declare them, which `declaredKeys()` reports:
+
+```java
+new Settings().declaredKeys();   // [game.hub-world, loot.tier-items, database, ...]
+```
+
+One entry there may own a whole block, and ignoring it takes the block with it. That is
+deliberate: half a block read from the file and half from the defaults is a shape nobody asked
+for.
+
+Ignores are applied after renames, so a key stays ignored whether the value in it came from the
+file directly or was carried there by a declared move.
+
 ### Deleting a declaration
 
 Once the files in the wild have been through an upgrade, the write-back has already moved them,

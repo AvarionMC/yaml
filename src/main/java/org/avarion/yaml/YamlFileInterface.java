@@ -43,6 +43,36 @@ public abstract class YamlFileInterface {
      * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
+        return load(file, Set.of());
+    }
+
+    /**
+     * Loads {@code file}, except for the keys named in {@code ignoredKeys}.
+     *
+     * <p>An ignored key is not read: the field keeps whatever it already holds, which for a
+     * freshly built configuration object is its compile-time default. The file is not altered by
+     * this — a following {@link #save(File)} writes the default out, because that is what the
+     * field now says.
+     *
+     * <p>What it is for is the one thing a file-beats-default rule cannot express. A settings
+     * file beats the default for every key it has, which is exactly what an operator's choice
+     * should do, and is also why a default that improves between releases never reaches anybody
+     * whose file already mentions it. Deciding whether a given line is a choice or an untouched
+     * copy of an older default needs to know what that older default was, which is the caller's
+     * business, not this library's. Acting on the answer is this method.
+     *
+     * <p>Names a key the way its field declares it — see {@link #declaredKeys()} — and takes
+     * everything under it: half a block read from the file and half from the defaults is a shape
+     * nobody asked for. Ignoring a key the file does not have does nothing.
+     *
+     * <p>Applied after {@link YamlRename} and {@link YamlKey#previously()} have moved what they
+     * move, so an ignored key stays ignored whether the value in it came from the file directly
+     * or was carried there by a declared move.
+     *
+     * @param ignoredKeys keys the file must not supply; empty for an ordinary load
+     */
+    public <T extends YamlFileInterface> T load(final @NotNull File file, final @NotNull Set<String> ignoredKeys)
+            throws IOException {
         renames = Map.of();
 
         if (!file.exists()) {
@@ -67,6 +97,7 @@ public abstract class YamlFileInterface {
         // lives now and written back there — a migration rather than a value quietly lost to the
         // write-back.
         renames = KeyRenames.applyTo(data, clazz, naming);
+        KeyRenames.drop(data, ignoredKeys);
 
         try {
             loadFields(data, isLenientByDefault, naming);
@@ -74,6 +105,30 @@ public abstract class YamlFileInterface {
             throw new IOException(e);
         }
         return (T) this;
+    }
+
+    /**
+     * The YAML keys this class's fields claim, in the order the fields declare them.
+     *
+     * <p>The unit a caller has to work in when it wants to say something about one setting — an
+     * ignore, a comparison against an older default — because a field is what actually reads the
+     * file. A field may own a whole block, in which case one entry here stands for every leaf
+     * under it.
+     *
+     * @see #load(File, Set)
+     */
+    public @NotNull List<String> declaredKeys() {
+        Naming naming = namingOf(this.getClass().getAnnotation(YamlFile.class));
+        List<String> keys = new ArrayList<>();
+        for (Class<?> clazz = this.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
+            for (Field field : clazz.getDeclaredFields()) {
+                YamlKey annotation = field.getAnnotation(YamlKey.class);
+                if (annotation != null) {
+                    keys.add(keyOf(field, annotation, naming));
+                }
+            }
+        }
+        return keys;
     }
 
     /**

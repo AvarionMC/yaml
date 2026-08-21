@@ -11,6 +11,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Carries settings from the keys they used to live under to the ones they live under now.
@@ -136,6 +137,22 @@ final class KeyRenames {
         TypeConverter.warn("'" + from + "' is now '" + to + "'; your value has been carried across.");
         applied.put(from, to);
         return true;
+    }
+
+    /**
+     * Take {@code paths} and everything under them out of {@code data}, so the fields that claim
+     * them keep what they already hold.
+     *
+     * @see YamlFileInterface#load(java.io.File, Set)
+     */
+    static void drop(final @NotNull Map<String, Object> data, final @NotNull Set<String> paths) {
+        for (String path : paths) {
+            String trimmed = path.trim();
+            Map<String, Object> parent = blockHolding(data, trimmed, false);
+            if (parent != null) {
+                parent.remove(leafOf(trimmed));
+            }
+        }
     }
 
     // ==================== Walking a dotted path ====================
