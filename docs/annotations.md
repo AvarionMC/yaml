@@ -100,10 +100,11 @@ public String myField = "default";
 
 ### Attributes
 
-| Attribute | Type       | Default     | Description                                                       |
-|-----------|------------|-------------|--------------------------------------------------------------------|
-| `value`   | `String`   | `""`        | The YAML key path (supports dot notation for nesting). Empty means "derive it from the field name" |
-| `lenient` | `Leniency` | `UNDEFINED` | Leniency mode for this specific field                             |
+| Attribute    | Type       | Default     | Description                                                       |
+|--------------|------------|-------------|--------------------------------------------------------------------|
+| `value`      | `String`   | `""`        | The YAML key path (supports dot notation for nesting). Empty means "derive it from the field name" |
+| `lenient`    | `Leniency` | `UNDEFINED` | Leniency mode for this specific field                             |
+| `previously` | `String[]` | `{}`        | Keys this setting used to be spelled as, newest first — see [Keys that have moved](#keys-that-have-moved) |
 
 ### Bare @YamlKey
 
@@ -207,6 +208,110 @@ round-trips.
 Dot notation is **not** supported here — a record component is one key inside the record's
 own block, so it cannot spread itself over a nested path. A `@YamlKey` containing a `.` on a
 record component throws an `IOException` on both save and load.
+
+---
+
+## Keys that have moved
+
+A key that changes name between releases is not merely unread. `save` writes the file from the
+fields, so a key no field claims is dropped on the next write and the value under it goes with
+it. Declaring where a setting used to live turns that into a migration: before any field reads
+the file, the value is carried to the key it lives under now, and the write-back persists it
+there.
+
+### One key: `@YamlKey(previously = ...)`
+
+```java
+@YamlKey(value = "storm.damage-per-second", previously = "zone.damage-per-second")
+public double damage = 1.0;
+```
+
+```yaml
+# what the operator has                 # what they get back
+zone:                                   storm:
+  damage-per-second: 6.0                  damage-per-second: 6.0
+```
+
+List several when a setting has moved more than once, most recent first:
+
+```java
+@YamlKey(value = "hud.boss-bar.colour", previously = {"zone.bar.colour", "bar.colour"})
+public String colour = "RED";
+```
+
+The first old name the file actually has is the one used. Each entry is a full path from the
+root of the file, in the same dot notation as `value`.
+
+### A whole block: `@YamlRename`
+
+Some moves no field-level alias can express — where the old key's new home is inside a structure
+that no single field owns:
+
+```java
+@YamlFile
+@YamlRename(from = "mysql", to = "database.mysql")
+public class Settings extends YamlFileInterface {
+
+    @YamlKey("database")
+    public DatabaseSettings database = DatabaseSettings.mysql("avarion");
+}
+```
+
+```yaml
+# what the operator has                 # what they get back
+mysql:                                  database:
+  hostname: db.internal                   engine: 'MYSQL'
+  port: 3307                              mysql:
+  password: hunter2                         hostname: db.internal
+                                            port: 3307
+                                            password: hunter2
+```
+
+The credentials that used to be a top-level block are now one component of a record, beside an
+`engine` the old file never had. `engine` comes out at its default because
+[a record component the file does not set keeps its default](records.md). The annotation is
+repeatable, so a class can declare as many moves as its history needs.
+
+### The rules
+
+| Situation                       | What happens                                                         |
+|---------------------------------|----------------------------------------------------------------------|
+| only the old key is set         | the value is carried across, and the move is logged                  |
+| only the current key is set     | nothing happens, silently                                            |
+| both are set                    | the current key wins, out loud; the old one is dropped               |
+| the old key is set but empty    | nothing happens — an empty line is not a value to carry              |
+| neither is set                  | nothing happens, silently                                            |
+| the destination path is blocked | the move is refused, out loud, and the old key is left where it is   |
+
+That last one is the case where something on the way to the destination is already a value
+rather than a section. Overwriting it would destroy one setting to rescue another, so the move
+is refused instead.
+
+Class-level moves are applied before field-level ones — coarse before fine — so a field can name
+an old key that only exists once a block has landed. A base class's declarations are applied
+before its subclass's.
+
+### What moved
+
+`renamesApplied()` reports what the last load did: each old path the class declares, mapped to
+the key that now holds its value. A path is in there whether the value was carried across or the
+current key was already set and won — either way the old key was accounted for, which is what
+tells a caller not to report it as a setting that vanished for no reason.
+
+```java
+Settings settings = new Settings().load(file);
+settings.renamesApplied();   // {mysql=database.mysql}
+```
+
+### Deleting a declaration
+
+Once the files in the wild have been through an upgrade, the write-back has already moved them,
+and the declaration is doing nothing. Delete it a release or two later.
+
+Declare a rename only when the meaning did not change with the name. The value is carried across
+verbatim, so a key that changed *units* as it changed name — a radius that became a diameter —
+must not be declared: it would quietly halve every setting it touched. Those are for a one-off
+migration in the calling code, which can do the arithmetic.
 
 ---
 

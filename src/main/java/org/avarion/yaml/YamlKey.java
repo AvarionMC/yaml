@@ -29,4 +29,30 @@ import java.lang.annotation.Target;
 public @interface YamlKey {
 	String value() default "";
     Leniency lenient() default Leniency.UNDEFINED;
+
+    /**
+     * Keys this setting used to be spelled as, newest first.
+     *
+     * <p>A key that moves between releases is not merely unread. The file is written back from
+     * the fields, so the old key is dropped and the value under it goes with it. Naming the old
+     * spelling here turns that into a migration: before any field is read, the value is moved to
+     * {@link #value()}, and the write-back persists it there — so the declaration can be deleted
+     * a release or two later, once the files in the wild have been through it.
+     *
+     * <pre>{@code
+     * @YamlKey(value = "storm.damage-per-second", previously = "zone.damage-per-second")
+     * public double damage = 1.0;
+     * }</pre>
+     *
+     * <p>The current key wins when the file holds both, and the older names are tried in the
+     * order given, so list the most recent first. Each entry is a full path from the root of the
+     * file, in the same dot notation as {@link #value()}.
+     *
+     * <p>This moves one key. A whole block that moved — where the old key's new home is inside a
+     * structure no single field owns — is declared on the class with {@link YamlRename}.
+     *
+     * <p>Not read on a record component: a component's key lives inside its record's block, and
+     * moving into or out of that block is a change to the block, which is {@link YamlRename}.
+     */
+    String[] previously() default {};
 }

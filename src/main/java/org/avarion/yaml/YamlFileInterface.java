@@ -24,6 +24,9 @@ public abstract class YamlFileInterface {
     static final Object UNKNOWN = new Object();
     private static final YamlWrapper yaml = YamlWrapperFactory.create();
 
+    /** Old key → the key now holding its value, for the last load. Never null. */
+    private @NotNull Map<String, String> renames = Map.of();
+
     // ==================== Load Methods ====================
 
     /**
@@ -40,6 +43,8 @@ public abstract class YamlFileInterface {
      * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
+        renames = Map.of();
+
         if (!file.exists()) {
             save(file);
             return (T) this;
@@ -50,18 +55,41 @@ public abstract class YamlFileInterface {
             content = new String(inputStream.readAllBytes());
         }
 
-        Map<String, Object> data = (Map<String, Object>) yaml.load(content);
+        Map<String, Object> parsed = (Map<String, Object>) yaml.load(content);
+        Map<String, Object> data = parsed == null ? new LinkedHashMap<>() : parsed;
 
         Class<?> clazz = this.getClass();
         YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
         boolean isLenientByDefault = yamlFileAnnotation == null || yamlFileAnnotation.lenient() != Leniency.STRICT;
+        Naming naming = namingOf(yamlFileAnnotation);
+
+        // Before any field looks at the file, so a setting that has moved is read from where it
+        // lives now and written back there — a migration rather than a value quietly lost to the
+        // write-back.
+        renames = KeyRenames.applyTo(data, clazz, naming);
 
         try {
-            loadFields(data, isLenientByDefault, namingOf(yamlFileAnnotation));
+            loadFields(data, isLenientByDefault, naming);
         } catch (IllegalAccessException | IllegalArgumentException | NullPointerException | FinalAttribute e) {
             throw new IOException(e);
         }
         return (T) this;
+    }
+
+    /**
+     * What the last load did with keys that have moved: each old path this class declares, mapped
+     * to the key that now holds its value.
+     *
+     * <p>Empty before any load, and after one that found nothing to move. A path appears here
+     * whether its value was carried across or the new key was already set and won — either way
+     * the old key was accounted for by a declaration, which is what tells a caller not to report
+     * it as a setting that vanished without explanation.
+     *
+     * @see YamlKey#previously()
+     * @see YamlRename
+     */
+    public @NotNull Map<String, String> renamesApplied() {
+        return renames;
     }
 
     /**
@@ -218,12 +246,8 @@ public abstract class YamlFileInterface {
 
     // ==================== Field Processing ====================
 
-    private void loadFields(Map<String, Object> data, boolean isLenientByDefault, @NotNull Naming naming)
+    private void loadFields(@NotNull Map<String, Object> data, boolean isLenientByDefault, @NotNull Naming naming)
             throws FinalAttribute, IllegalAccessException, IOException {
-        if (data == null) {
-            data = new HashMap<>();
-        }
-
         for (Class<?> clazz = this.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
             for (Field field : clazz.getDeclaredFields()) {
                 YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
@@ -277,7 +301,7 @@ public abstract class YamlFileInterface {
             @Nullable Object current)
             throws IOException {
         try {
-            return new TypeConverter(naming, isLenient).getConvertedValue(field, value, current);
+            return new TypeConverter(naming, isLenient).getConvertedValue(field, field.getType(), value, current);
         }
         catch (IOException e) {
             throw new IOException(key + ": " + e.getMessage(), e);
@@ -327,7 +351,7 @@ public abstract class YamlFileInterface {
      * The YAML key for a field: its {@link YamlKey} when one is spelled out, otherwise the
      * field's own name run through the naming strategy.
      */
-    private static @NotNull String keyOf(final @NotNull Field field, final @NotNull YamlKey annotation, final @NotNull Naming naming) {
+    static @NotNull String keyOf(final @NotNull Field field, final @NotNull YamlKey annotation, final @NotNull Naming naming) {
         String key = annotation.value().trim();
         return key.isEmpty() ? naming.convert(field.getName()) : key;
     }

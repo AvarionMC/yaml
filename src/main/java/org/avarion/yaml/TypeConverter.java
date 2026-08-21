@@ -82,22 +82,6 @@ final class TypeConverter {
     // ==================== Main Entry Points ====================
 
     /**
-     * Convert a value to the type specified by the field.
-     */
-    @Nullable Object getConvertedValue(final @NotNull Field field, final Object value) throws IOException {
-        return getConvertedValue(field, field.getType(), value, null);
-    }
-
-    /**
-     * Convert a value to the type specified by the field, keeping whatever {@code fallback}
-     * already holds for anything inside a record the YAML does not mention.
-     */
-    @Nullable Object getConvertedValue(final @NotNull Field field, final Object value, final @Nullable Object fallback)
-            throws IOException {
-        return getConvertedValue(field, field.getType(), value, fallback);
-    }
-
-    /**
      * Convert a value to the expected type with optional field context.
      */
     @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value)

@@ -105,6 +105,41 @@ class PartialRecordTests extends TestCommon {
     }
 
     @Test
+    void aFallbackThatRefusesToAnswerIsTreatedAsNoAnswer() throws IOException {
+        // A record may write its own accessor, and that accessor may throw. Asking it what the
+        // default was is a convenience, so a refusal costs the convenience and nothing else --
+        // the component takes the road it took before there were fallbacks at all.
+        writeYaml("awkward:\n  other: from-file\n");
+
+        AwkwardHolder loaded = new AwkwardHolder().load(target);
+
+        assertThat(loaded.awkward.other()).isEqualTo("from-file");
+        assertThat(loaded.awkward.temperamental()).isNull();
+    }
+
+    /**
+     * A record whose accessor refuses to answer for one particular value — the one the default
+     * instance is built with, so it is exactly the fallback probe that gets refused.
+     */
+    public record Awkward(String temperamental, String other) {
+        static final String REFUSES = "asking me about this one throws";
+
+        @Override
+        public String temperamental() {
+            if (REFUSES.equals(temperamental)) {
+                throw new IllegalStateException("this accessor does not answer");
+            }
+            return temperamental;
+        }
+    }
+
+    @YamlFile
+    public static class AwkwardHolder extends YamlFileInterface {
+        @YamlKey("awkward")
+        public Awkward awkward = new Awkward(Awkward.REFUSES, "default");
+    }
+
+    @Test
     void theWriteBackFillsInWhatTheFileLeftOut() throws IOException {
         writeYaml("""
                 database:
