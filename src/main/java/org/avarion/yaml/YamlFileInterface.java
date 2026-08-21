@@ -377,22 +377,27 @@ public abstract class YamlFileInterface {
             result.append("\n");
         }
 
-        // Fields
+        // Fields, up the class hierarchy exactly as loadFields walks it. Reading further than
+        // writing is worse than either alone: an inherited key would be loaded from the file and
+        // then left out of what replaces it, so a load-then-save cycle deletes the setting along
+        // with whatever the operator had put in it.
         Naming naming = namingOf(yamlFileAnnotation);
         NestedMap nestedMap = new NestedMap();
-        for (Field field : clazz.getDeclaredFields()) {
-            YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
+        for (Class<?> owner = clazz; owner != null; owner = owner.getSuperclass()) {
+            for (Field field : owner.getDeclaredFields()) {
+                YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
 
-            if (keyAnnotation != null) {
-                if (Modifier.isFinal(field.getModifiers())) {
-                    throw new FinalAttribute(field.getName());
+                if (keyAnnotation != null) {
+                    if (Modifier.isFinal(field.getModifiers())) {
+                        throw new FinalAttribute(field.getName());
+                    }
+
+                    field.setAccessible(true);
+                    Object value = field.get(this);
+                    YamlComment comment = field.getAnnotation(YamlComment.class);
+
+                    nestedMap.put(keyOf(field, keyAnnotation, naming), comment == null ? null : comment.value(), value);
                 }
-
-                field.setAccessible(true);
-                Object value = field.get(this);
-                YamlComment comment = field.getAnnotation(YamlComment.class);
-
-                nestedMap.put(keyOf(field, keyAnnotation, naming), comment == null ? null : comment.value(), value);
             }
         }
 
