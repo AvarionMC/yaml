@@ -107,20 +107,23 @@ class NamingTests extends TestCommon {
     @Test
     void testKeepDoesNotAnswerToConvertedComponentKeys() throws IOException {
         // The block itself is found, but its components are spelled the SNAKE_CASE way.
+        // The two keys that DO line up are given values unlike the defaults, so a component
+        // that kept its default cannot be mistaken for one that was read.
         writeYaml("""
                 derivedBlock:
                   model_id: a
                   model_id2: b
                   http_url: c
-                  name: d
-                  someCamelKey: e
+                  name: from-file
+                  someCamelKey: also-from-file
                 """);
 
         KeepNamingClass loaded = new KeepNamingClass();
         loaded.load(target);
 
         // Under KEEP only 'name' (single word, so unaffected by conversion) and the explicitly
-        // named key still line up; the converted spellings are not recognised.
-        assertEquals(new NamingRecord(null, null, null, "d", "e"), loaded.derivedBlock);
+        // named key still line up. The converted spellings are not recognised, so nothing in the
+        // file addresses those three components and they keep the defaults they came with.
+        assertEquals(new NamingRecord("a", "b", "c", "from-file", "also-from-file"), loaded.derivedBlock);
     }
 }

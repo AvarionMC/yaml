@@ -247,12 +247,16 @@ public abstract class YamlFileInterface {
 
         Object value = getNestedValue(data, key.split("\\."));
         if (value != UNKNOWN) {
-            Object converted = convert(key, field, value, naming, isLenient);
+            field.setAccessible(true);
+            // Read before the conversion, because the conversion may need it: a
+            // record block the file only half fills in takes the rest from what
+            // the field already holds.
+            Object current = field.get(this);
+            Object converted = convert(key, field, value, naming, isLenient, current);
             if (converted == TypeConverter.LENIENT_ENUM_SKIP) {
                 // Lenient mode: bad enum value at top level — leave field at its default
                 return;
             }
-            field.setAccessible(true);
             field.set(this, converted);
         }
     }
@@ -264,12 +268,16 @@ public abstract class YamlFileInterface {
      * The converter is handed a {@link Field}, whose name is the Java one — the
      * reader is looking at a yaml file and needs the yaml one. This is the only
      * place a conversion is started, and the only one where both are in scope.
+     *
+     * @param current what the field holds now, which is what a record component
+     *                the file does not mention falls back to
      */
     private static Object convert(
-            @NotNull String key, @NotNull Field field, @NotNull Object value, @NotNull Naming naming, boolean isLenient)
+            @NotNull String key, @NotNull Field field, @NotNull Object value, @NotNull Naming naming, boolean isLenient,
+            @Nullable Object current)
             throws IOException {
         try {
-            return new TypeConverter(naming, isLenient).getConvertedValue(field, value);
+            return new TypeConverter(naming, isLenient).getConvertedValue(field, value, current);
         }
         catch (IOException e) {
             throw new IOException(key + ": " + e.getMessage(), e);
