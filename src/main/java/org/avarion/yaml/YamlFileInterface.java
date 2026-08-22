@@ -100,7 +100,9 @@ public abstract class YamlFileInterface {
         KeyRenames.drop(data, ignoredKeys);
 
         try {
-            loadFields(data, isLenientByDefault, naming);
+            for (Field field : yamlKeyFields(clazz)) {
+                readYamlKeyField(data, field, isLenientByDefault, naming);
+            }
         } catch (IllegalAccessException | IllegalArgumentException | NullPointerException | FinalAttribute e) {
             throw new IOException(e);
         }
@@ -120,13 +122,8 @@ public abstract class YamlFileInterface {
     public @NotNull List<String> declaredKeys() {
         Naming naming = namingOf(this.getClass().getAnnotation(YamlFile.class));
         List<String> keys = new ArrayList<>();
-        for (Class<?> clazz = this.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
-            for (Field field : clazz.getDeclaredFields()) {
-                YamlKey annotation = field.getAnnotation(YamlKey.class);
-                if (annotation != null) {
-                    keys.add(keyOf(field, annotation, naming));
-                }
-            }
+        for (Field field : yamlKeyFields(this.getClass())) {
+            keys.add(keyOf(field, field.getAnnotation(YamlKey.class), naming));
         }
         return keys;
     }
@@ -301,26 +298,35 @@ public abstract class YamlFileInterface {
 
     // ==================== Field Processing ====================
 
-    private void loadFields(@NotNull Map<String, Object> data, boolean isLenientByDefault, @NotNull Naming naming)
-            throws FinalAttribute, IllegalAccessException, IOException {
-        for (Class<?> clazz = this.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
+    /**
+     * Every field in {@code type} and its superclasses that carries a {@link YamlKey},
+     * subclass first.
+     *
+     * <p>The one answer to which fields take part. Loading, saving, {@link #declaredKeys()}
+     * and {@link KeyRenames} all walk this list, so none of them can disagree about it — and
+     * such a disagreement is never harmless: a field only one side knows about is a setting
+     * that is read but not kept, or kept but never read.
+     */
+    static @NotNull List<Field> yamlKeyFields(final @NotNull Class<?> type) {
+        List<Field> fields = new ArrayList<>();
+        for (Class<?> clazz = type; clazz != null; clazz = clazz.getSuperclass()) {
             for (Field field : clazz.getDeclaredFields()) {
-                YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-
-                if (keyAnnotation != null) {
-                    readYamlKeyField(data, field, keyAnnotation, isLenientByDefault, naming);
+                if (field.isAnnotationPresent(YamlKey.class)) {
+                    fields.add(field);
                 }
             }
         }
+        return fields;
     }
 
     private void readYamlKeyField(
-            Map<String, Object> data, @NotNull Field field, @NotNull YamlKey annotation, boolean isLenientByDefault, @NotNull Naming naming)
+            Map<String, Object> data, @NotNull Field field, boolean isLenientByDefault, @NotNull Naming naming)
             throws FinalAttribute, IllegalAccessException, IOException {
         if (Modifier.isFinal(field.getModifiers())) {
             throw new FinalAttribute(field.getName());
         }
 
+        YamlKey annotation = field.getAnnotation(YamlKey.class);
         String key = keyOf(field, annotation, naming);
         boolean isLenient = isLenient(annotation.lenient(), isLenientByDefault);
 
@@ -377,28 +383,23 @@ public abstract class YamlFileInterface {
             result.append("\n");
         }
 
-        // Fields, up the class hierarchy exactly as loadFields walks it. Reading further than
-        // writing is worse than either alone: an inherited key would be loaded from the file and
-        // then left out of what replaces it, so a load-then-save cycle deletes the setting along
-        // with whatever the operator had put in it.
+        // The same walk loading uses, so reading and writing cannot disagree about which
+        // fields take part. Reading further than writing would be worse than either alone: an
+        // inherited key would be loaded from the file and then left out of what replaces it,
+        // so a load-then-save cycle would delete the setting along with whatever the operator
+        // had put in it.
         Naming naming = namingOf(yamlFileAnnotation);
         NestedMap nestedMap = new NestedMap();
-        for (Class<?> owner = clazz; owner != null; owner = owner.getSuperclass()) {
-            for (Field field : owner.getDeclaredFields()) {
-                YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-
-                if (keyAnnotation != null) {
-                    if (Modifier.isFinal(field.getModifiers())) {
-                        throw new FinalAttribute(field.getName());
-                    }
-
-                    field.setAccessible(true);
-                    Object value = field.get(this);
-                    YamlComment comment = field.getAnnotation(YamlComment.class);
-
-                    nestedMap.put(keyOf(field, keyAnnotation, naming), comment == null ? null : comment.value(), value);
-                }
+        for (Field field : yamlKeyFields(clazz)) {
+            if (Modifier.isFinal(field.getModifiers())) {
+                throw new FinalAttribute(field.getName());
             }
+
+            field.setAccessible(true);
+            Object value = field.get(this);
+            YamlComment comment = field.getAnnotation(YamlComment.class);
+
+            nestedMap.put(keyOf(field, field.getAnnotation(YamlKey.class), naming), comment == null ? null : comment.value(), value);
         }
 
         // Convert the nested map to YAML using YamlWriter

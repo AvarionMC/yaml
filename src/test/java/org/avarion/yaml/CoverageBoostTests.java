@@ -17,11 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CoverageBoostTests extends TestCommon {
 
-    // ==================== YamlFileInterface: loadFields with null data ====================
+    // ==================== YamlFileInterface: a file that parses to nothing ====================
 
     @Test
     void testLoadEmptyYamlFile() throws IOException {
-        // Write an empty file, then load → data will be null, triggers null check
+        // An empty file parses to null; load() treats that as an empty map, so defaults stand
         try (FileWriter writer = new FileWriter(target)) {
             writer.write("");
         }
@@ -37,7 +37,7 @@ class CoverageBoostTests extends TestCommon {
 
     @Test
     void testLoadYamlWithOnlyComments() throws IOException {
-        // YAML file with only comments → parses to null data
+        // A file holding only comments parses to null just like an empty one
         try (FileWriter writer = new FileWriter(target)) {
             writer.write("# This is just a comment\n# Nothing here\n");
         }

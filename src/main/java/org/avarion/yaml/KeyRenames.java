@@ -48,20 +48,18 @@ final class KeyRenames {
             move(data, rename.from(), rename.to(), applied);
         }
 
-        for (Class<?> clazz = type; clazz != null; clazz = clazz.getSuperclass()) {
-            for (Field field : clazz.getDeclaredFields()) {
-                YamlKey annotation = field.getAnnotation(YamlKey.class);
-                if (annotation == null || annotation.previously().length == 0) {
-                    continue;
-                }
-                String to = YamlFileInterface.keyOf(field, annotation, naming);
-                for (String from : annotation.previously()) {
-                    // Newest first, and the first one the file actually has wins: a file holding
-                    // two generations of the same key was hand-edited across an upgrade, and the
-                    // later spelling is the better guess at what they meant.
-                    if (move(data, from, to, applied)) {
-                        break;
-                    }
+        for (Field field : YamlFileInterface.yamlKeyFields(type)) {
+            YamlKey annotation = field.getAnnotation(YamlKey.class);
+            if (annotation.previously().length == 0) {
+                continue;
+            }
+            String to = YamlFileInterface.keyOf(field, annotation, naming);
+            for (String from : annotation.previously()) {
+                // Newest first, and the first one the file actually has wins: a file holding
+                // two generations of the same key was hand-edited across an upgrade, and the
+                // later spelling is the better guess at what they meant.
+                if (move(data, from, to, applied)) {
+                    break;
                 }
             }
         }
