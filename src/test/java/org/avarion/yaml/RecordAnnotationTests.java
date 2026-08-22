@@ -173,8 +173,12 @@ class RecordAnnotationTests extends TestCommon {
         RenamedRecordClass loaded = new RenamedRecordClass();
         loaded.load(target);
 
-        // 'port' still loads by component name; the renamed ones no longer answer to it.
-        assertEquals(new RenamedDatabase(null, 3306, null), loaded.database);
+        // 'port' still loads by component name; the renamed ones no longer answer to it. As far
+        // as those two are concerned the file said nothing about them, so their defaults stand —
+        // the same thing an unrecognised key does at the top level, where it leaves the field
+        // alone and is reported by whoever is watching for keys that belong to nothing.
+        assertEquals(new RenamedDatabase("localhost", 3306, new RenamedCredentials("admin", "secret")),
+                loaded.database);
     }
 
     // ===== Unsupported dotted keys =====

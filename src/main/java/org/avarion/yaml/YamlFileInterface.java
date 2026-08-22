@@ -24,6 +24,9 @@ public abstract class YamlFileInterface {
     static final Object UNKNOWN = new Object();
     private static final YamlWrapper yaml = YamlWrapperFactory.create();
 
+    /** Old key → the key now holding its value, for the last load. Never null. */
+    private @NotNull Map<String, String> renames = Map.of();
+
     // ==================== Load Methods ====================
 
     /**
@@ -40,6 +43,38 @@ public abstract class YamlFileInterface {
      * }</pre>
      */
     public <T extends YamlFileInterface> T load(final @NotNull File file) throws IOException {
+        return load(file, Set.of());
+    }
+
+    /**
+     * Loads {@code file}, except for the keys named in {@code ignoredKeys}.
+     *
+     * <p>An ignored key is not read: the field keeps whatever it already holds, which for a
+     * freshly built configuration object is its compile-time default. The file is not altered by
+     * this — a following {@link #save(File)} writes the default out, because that is what the
+     * field now says.
+     *
+     * <p>What it is for is the one thing a file-beats-default rule cannot express. A settings
+     * file beats the default for every key it has, which is exactly what an operator's choice
+     * should do, and is also why a default that improves between releases never reaches anybody
+     * whose file already mentions it. Deciding whether a given line is a choice or an untouched
+     * copy of an older default needs to know what that older default was, which is the caller's
+     * business, not this library's. Acting on the answer is this method.
+     *
+     * <p>Names a key the way its field declares it — see {@link #declaredKeys()} — and takes
+     * everything under it: half a block read from the file and half from the defaults is a shape
+     * nobody asked for. Ignoring a key the file does not have does nothing.
+     *
+     * <p>Applied after {@link YamlRename} and {@link YamlKey#previously()} have moved what they
+     * move, so an ignored key stays ignored whether the value in it came from the file directly
+     * or was carried there by a declared move.
+     *
+     * @param ignoredKeys keys the file must not supply; empty for an ordinary load
+     */
+    public <T extends YamlFileInterface> T load(final @NotNull File file, final @NotNull Set<String> ignoredKeys)
+            throws IOException {
+        renames = Map.of();
+
         if (!file.exists()) {
             save(file);
             return (T) this;
@@ -50,18 +85,65 @@ public abstract class YamlFileInterface {
             content = new String(inputStream.readAllBytes());
         }
 
-        Map<String, Object> data = (Map<String, Object>) yaml.load(content);
+        Map<String, Object> parsed = (Map<String, Object>) yaml.load(content);
+        Map<String, Object> data = parsed == null ? new LinkedHashMap<>() : parsed;
 
         Class<?> clazz = this.getClass();
         YamlFile yamlFileAnnotation = clazz.getAnnotation(YamlFile.class);
         boolean isLenientByDefault = yamlFileAnnotation == null || yamlFileAnnotation.lenient() != Leniency.STRICT;
+        Naming naming = namingOf(yamlFileAnnotation);
+
+        // Before any field looks at the file, so a setting that has moved is read from where it
+        // lives now and written back there — a migration rather than a value quietly lost to the
+        // write-back.
+        renames = Collections.unmodifiableMap(KeyRenames.applyTo(data, clazz, naming));
+        KeyRenames.drop(data, ignoredKeys);
 
         try {
-            loadFields(data, isLenientByDefault, namingOf(yamlFileAnnotation));
+            for (Field field : yamlKeyFields(clazz)) {
+                readYamlKeyField(data, field, isLenientByDefault, naming);
+            }
         } catch (IllegalAccessException | IllegalArgumentException | NullPointerException | FinalAttribute e) {
             throw new IOException(e);
         }
         return (T) this;
+    }
+
+    /**
+     * The YAML keys this class's fields claim, in the order the fields declare them.
+     *
+     * <p>The unit a caller has to work in when it wants to say something about one setting — an
+     * ignore, a comparison against an older default — because a field is what actually reads the
+     * file. A field may own a whole block, in which case one entry here stands for every leaf
+     * under it.
+     *
+     * @see #load(File, Set)
+     */
+    public @NotNull List<String> declaredKeys() {
+        Naming naming = namingOf(this.getClass().getAnnotation(YamlFile.class));
+        List<String> keys = new ArrayList<>();
+        for (Field field : yamlKeyFields(this.getClass())) {
+            keys.add(keyOf(field, field.getAnnotation(YamlKey.class), naming));
+        }
+        return keys;
+    }
+
+    /**
+     * What the last load did with keys that have moved: each old path this class declares, mapped
+     * to the key that now holds its value.
+     *
+     * <p>Read-only: what a load did is a report, not a thing to edit.
+     *
+     * <p>Empty before any load, and after one that found nothing to move. A path appears here
+     * whether its value was carried across or the new key was already set and won — either way
+     * the old key was accounted for by a declaration, which is what tells a caller not to report
+     * it as a setting that vanished without explanation.
+     *
+     * @see YamlKey#previously()
+     * @see YamlRename
+     */
+    public @NotNull Map<String, String> renamesApplied() {
+        return renames;
     }
 
     /**
@@ -218,41 +300,50 @@ public abstract class YamlFileInterface {
 
     // ==================== Field Processing ====================
 
-    private void loadFields(Map<String, Object> data, boolean isLenientByDefault, @NotNull Naming naming)
-            throws FinalAttribute, IllegalAccessException, IOException {
-        if (data == null) {
-            data = new HashMap<>();
-        }
-
-        for (Class<?> clazz = this.getClass(); clazz != null; clazz = clazz.getSuperclass()) {
+    /**
+     * Every field in {@code type} and its superclasses that carries a {@link YamlKey},
+     * subclass first.
+     *
+     * <p>The one answer to which fields take part. Loading, saving, {@link #declaredKeys()}
+     * and {@link KeyRenames} all walk this list, so none of them can disagree about it — and
+     * such a disagreement is never harmless: a field only one side knows about is a setting
+     * that is read but not kept, or kept but never read.
+     */
+    static @NotNull List<Field> yamlKeyFields(final @NotNull Class<?> type) {
+        List<Field> fields = new ArrayList<>();
+        for (Class<?> clazz = type; clazz != null; clazz = clazz.getSuperclass()) {
             for (Field field : clazz.getDeclaredFields()) {
-                YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-
-                if (keyAnnotation != null) {
-                    readYamlKeyField(data, field, keyAnnotation, isLenientByDefault, naming);
+                if (field.isAnnotationPresent(YamlKey.class)) {
+                    fields.add(field);
                 }
             }
         }
+        return fields;
     }
 
     private void readYamlKeyField(
-            Map<String, Object> data, @NotNull Field field, @NotNull YamlKey annotation, boolean isLenientByDefault, @NotNull Naming naming)
+            Map<String, Object> data, @NotNull Field field, boolean isLenientByDefault, @NotNull Naming naming)
             throws FinalAttribute, IllegalAccessException, IOException {
         if (Modifier.isFinal(field.getModifiers())) {
             throw new FinalAttribute(field.getName());
         }
 
+        YamlKey annotation = field.getAnnotation(YamlKey.class);
         String key = keyOf(field, annotation, naming);
         boolean isLenient = isLenient(annotation.lenient(), isLenientByDefault);
 
         Object value = getNestedValue(data, key.split("\\."));
         if (value != UNKNOWN) {
-            Object converted = convert(key, field, value, naming, isLenient);
+            field.setAccessible(true);
+            // Read before the conversion, because the conversion may need it: a
+            // record block the file only half fills in takes the rest from what
+            // the field already holds.
+            Object current = field.get(this);
+            Object converted = convert(key, field, value, naming, isLenient, current);
             if (converted == TypeConverter.LENIENT_ENUM_SKIP) {
                 // Lenient mode: bad enum value at top level — leave field at its default
                 return;
             }
-            field.setAccessible(true);
             field.set(this, converted);
         }
     }
@@ -264,12 +355,16 @@ public abstract class YamlFileInterface {
      * The converter is handed a {@link Field}, whose name is the Java one — the
      * reader is looking at a yaml file and needs the yaml one. This is the only
      * place a conversion is started, and the only one where both are in scope.
+     *
+     * @param current what the field holds now, which is what a record component
+     *                the file does not mention falls back to
      */
     private static Object convert(
-            @NotNull String key, @NotNull Field field, @NotNull Object value, @NotNull Naming naming, boolean isLenient)
+            @NotNull String key, @NotNull Field field, @NotNull Object value, @NotNull Naming naming, boolean isLenient,
+            @Nullable Object current)
             throws IOException {
         try {
-            return new TypeConverter(naming, isLenient).getConvertedValue(field, value);
+            return new TypeConverter(naming, isLenient).getConvertedValue(field, field.getType(), value, current);
         }
         catch (IOException e) {
             throw new IOException(key + ": " + e.getMessage(), e);
@@ -290,23 +385,23 @@ public abstract class YamlFileInterface {
             result.append("\n");
         }
 
-        // Fields
+        // The same walk loading uses, so reading and writing cannot disagree about which
+        // fields take part. Reading further than writing would be worse than either alone: an
+        // inherited key would be loaded from the file and then left out of what replaces it,
+        // so a load-then-save cycle would delete the setting along with whatever the operator
+        // had put in it.
         Naming naming = namingOf(yamlFileAnnotation);
         NestedMap nestedMap = new NestedMap();
-        for (Field field : clazz.getDeclaredFields()) {
-            YamlKey keyAnnotation = field.getAnnotation(YamlKey.class);
-
-            if (keyAnnotation != null) {
-                if (Modifier.isFinal(field.getModifiers())) {
-                    throw new FinalAttribute(field.getName());
-                }
-
-                field.setAccessible(true);
-                Object value = field.get(this);
-                YamlComment comment = field.getAnnotation(YamlComment.class);
-
-                nestedMap.put(keyOf(field, keyAnnotation, naming), comment == null ? null : comment.value(), value);
+        for (Field field : yamlKeyFields(clazz)) {
+            if (Modifier.isFinal(field.getModifiers())) {
+                throw new FinalAttribute(field.getName());
             }
+
+            field.setAccessible(true);
+            Object value = field.get(this);
+            YamlComment comment = field.getAnnotation(YamlComment.class);
+
+            nestedMap.put(keyOf(field, field.getAnnotation(YamlKey.class), naming), comment == null ? null : comment.value(), value);
         }
 
         // Convert the nested map to YAML using YamlWriter
@@ -319,7 +414,7 @@ public abstract class YamlFileInterface {
      * The YAML key for a field: its {@link YamlKey} when one is spelled out, otherwise the
      * field's own name run through the naming strategy.
      */
-    private static @NotNull String keyOf(final @NotNull Field field, final @NotNull YamlKey annotation, final @NotNull Naming naming) {
+    static @NotNull String keyOf(final @NotNull Field field, final @NotNull YamlKey annotation, final @NotNull Naming naming) {
         String key = annotation.value().trim();
         return key.isEmpty() ? naming.convert(field.getName()) : key;
     }

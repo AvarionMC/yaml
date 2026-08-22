@@ -241,9 +241,46 @@ player:
     rank: Captain
 ```
 
+## Components the File Leaves Out
+
+A key the file omits leaves its field alone, and that rule does not stop at a record's edge. A
+component the YAML never mentions keeps whatever the target already held — for a settings class,
+its compile-time default:
+
+```java
+public record Credentials(String hostname, int port, String password) {}
+
+public record Database(Engine engine, Credentials mysql) {}
+
+public class Config extends YamlFileInterface {
+
+    @YamlKey("database")
+    public Database database =
+            new Database(Engine.MYSQL, new Credentials("db.default", 3306, "secret"));
+}
+```
+
+```yaml
+database:
+  mysql:
+    hostname: db.internal
+```
+
+loads as `Database(MYSQL, Credentials("db.internal", 3306, "secret"))` — the one setting the file
+states, and the defaults for everything it does not. The next `save` writes all of it out, so the
+gaps are filled in on disk too.
+
+This is what lets a block move into a record that has since grown a component (see
+[Keys that have moved](annotations.md#keys-that-have-moved)): the operator's old block arrives,
+and the component they never had comes from this release's defaults.
+
+Writing a key down empty is a different statement from leaving it out, and only the second is a
+question about defaults — see below.
+
 ## Null Values in Records
 
-Record components can be null (except primitives):
+Record components can be null (except primitives). A component whose key is present and empty is
+null, and stays null:
 
 ```java
 public record OptionalInfo(String required, String optional) {}

@@ -82,16 +82,21 @@ final class TypeConverter {
     // ==================== Main Entry Points ====================
 
     /**
-     * Convert a value to the type specified by the field.
+     * Convert a value to the expected type with optional field context.
      */
-    @Nullable Object getConvertedValue(final @NotNull Field field, final Object value) throws IOException {
-        return getConvertedValue(field, field.getType(), value);
+    @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value)
+            throws IOException {
+        return getConvertedValue(field, expectedType, value, null);
     }
 
     /**
      * Convert a value to the expected type with optional field context.
+     *
+     * @param fallback what the target already holds, consulted only for a record component the
+     *                 YAML leaves out entirely; {@code null} when there is nothing to fall back on
      */
-    @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value) throws IOException {
+    @Nullable Object getConvertedValue(final @Nullable Field field, final @NotNull Class<?> expectedType, final Object value,
+                                       final @Nullable Object fallback) throws IOException {
         if (value == null) {
             return handleNullValue(expectedType, field);
         }
@@ -140,7 +145,7 @@ final class TypeConverter {
 
         // Handle Records: convert Map to Record using canonical constructor
         if (value instanceof Map && expectedType.isRecord()) {
-            return convertMapToRecord(expectedType, (Map<?, ?>) value);
+            return convertMapToRecord(expectedType, (Map<?, ?>) value, fallback);
         }
 
         // For other classes, attempt to use their constructor that takes a String parameter
@@ -213,6 +218,15 @@ final class TypeConverter {
      * For simple types, it delegates to getConvertedValue to avoid code duplication.
      */
     @Nullable Object convertWithType(final @NotNull Type type, final Object value) throws IOException {
+        return convertWithType(type, value, null);
+    }
+
+    /**
+     * As {@link #convertWithType(Type, Object)}, carrying what the target already holds so a
+     * record nested inside this one can keep the components the YAML leaves out.
+     */
+    @Nullable Object convertWithType(final @NotNull Type type, final Object value, final @Nullable Object fallback)
+            throws IOException {
         Class<?> rawClass = getRawClass(type);
 
         if (value == null) {
@@ -227,7 +241,7 @@ final class TypeConverter {
 
         // For all other types (primitives, String, enums, UUID, numbers, chars, etc.),
         // delegate to getConvertedValue which has all the conversion logic in one place.
-        return getConvertedValue(null, rawClass, value);
+        return getConvertedValue(null, rawClass, value, fallback);
     }
 
     // ==================== Collection & Map Handling ====================
@@ -306,13 +320,27 @@ final class TypeConverter {
      * Supports nested records: if a component is itself a record and the value is a Map,
      * it will recursively convert the nested Map to the nested record type.
      */
-    private @NotNull Object convertMapToRecord(final @NotNull Class<?> recordClass, final @NotNull Map<?, ?> map) throws IOException {
+    private @NotNull Object convertMapToRecord(final @NotNull Class<?> recordClass, final @NotNull Map<?, ?> map,
+                                               final @Nullable Object fallback) throws IOException {
         RecordComponent[] components = recordClass.getRecordComponents();
         Object[] args = new Object[components.length];
 
         for (int i = 0; i < components.length; i++) {
             RecordComponent component = components[i];
-            Object value = map.get(RecordComponents.keyOf(component, naming));
+            String key = RecordComponents.keyOf(component, naming);
+            Object existing = componentOf(recordClass, fallback, component);
+
+            // Not written down at all is not the same statement as written down
+            // empty: the first says nothing about this setting, so whatever the
+            // target already held stands, exactly as it would for a top-level
+            // field whose key the file omits. A key that IS present and null
+            // falls through and means null, primitives included.
+            if (!map.containsKey(key) && existing != null) {
+                args[i] = existing;
+                continue;
+            }
+
+            Object value = map.get(key);
 
             if (value == null && component.getType().isPrimitive()) {
                 throw new IOException("Cannot assign null to primitive record component '" + component.getName() +
@@ -321,7 +349,7 @@ final class TypeConverter {
 
             // convertWithType already routes nested records, maps and collections by their generic
             // type, so every non-null component takes the same road in.
-            args[i] = value == null ? null : convertWithType(component.getGenericType(), value);
+            args[i] = value == null ? null : convertWithType(component.getGenericType(), value, existing);
 
             // A record component cannot be skipped, so a lenient enum-skip becomes null
             if (args[i] == LENIENT_ENUM_SKIP) {
@@ -340,6 +368,29 @@ final class TypeConverter {
         }
         catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
             throw new IOException("Failed to instantiate record " + recordClass.getSimpleName() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * What {@code fallback} holds for one component, or {@code null} when there is nothing to
+     * ask — no fallback at all, or one that is not this record.
+     *
+     * <p>An accessor that refuses to answer is treated as no answer rather than as a failure to
+     * load: the component then takes the same road a component with no fallback takes, which is
+     * the behaviour of every release before fallbacks existed.
+     */
+    private static @Nullable Object componentOf(final @NotNull Class<?> recordClass, final @Nullable Object fallback,
+                                                final @NotNull RecordComponent component) {
+        if (!recordClass.isInstance(fallback)) {
+            return null;
+        }
+        try {
+            Method accessor = component.getAccessor();
+            accessor.setAccessible(true);
+            return accessor.invoke(fallback);
+        }
+        catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
         }
     }
 
