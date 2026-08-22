@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.LogRecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -165,10 +166,9 @@ class RenameTests extends TestCommon {
                   damage-per-second: 6.0
                 """);
 
-        RenamedKeyClass loaded = new RenamedKeyClass().load(target);
+        Map<String, String> applied = new RenamedKeyClass().load(target).renamesApplied();
 
-        assertThatThrownBy(() -> loaded.renamesApplied().clear())
-                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(applied::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
