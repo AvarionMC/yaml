@@ -96,7 +96,7 @@ public abstract class YamlFileInterface {
         // Before any field looks at the file, so a setting that has moved is read from where it
         // lives now and written back there — a migration rather than a value quietly lost to the
         // write-back.
-        renames = KeyRenames.applyTo(data, clazz, naming);
+        renames = Collections.unmodifiableMap(KeyRenames.applyTo(data, clazz, naming));
         KeyRenames.drop(data, ignoredKeys);
 
         try {
@@ -131,6 +131,8 @@ public abstract class YamlFileInterface {
     /**
      * What the last load did with keys that have moved: each old path this class declares, mapped
      * to the key that now holds its value.
+     *
+     * <p>Read-only: what a load did is a report, not a thing to edit.
      *
      * <p>Empty before any load, and after one that found nothing to move. A path appears here
      * whether its value was carried across or the new key was already set and won — either way

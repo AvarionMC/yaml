@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.logging.LogRecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Declared renames: where a setting used to live, said once in the class.
@@ -153,6 +154,21 @@ class RenameTests extends TestCommon {
         assertThat(loaded.renamesApplied())
                 .containsEntry("zone.damage-per-second", "storm.damage-per-second")
                 .hasSize(1);
+    }
+
+    @Test
+    void theRecordOfMovesIsAReportNotAThingToEdit() throws IOException {
+        // What the load did is not negotiable after the fact, and handing out the live map
+        // would let a caller quietly rewrite it.
+        writeYaml("""
+                zone:
+                  damage-per-second: 6.0
+                """);
+
+        RenamedKeyClass loaded = new RenamedKeyClass().load(target);
+
+        assertThatThrownBy(() -> loaded.renamesApplied().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
