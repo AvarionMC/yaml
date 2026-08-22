@@ -109,7 +109,7 @@ class IgnoredKeyTests extends TestCommon {
     // ===== declaredKeys =====
 
     @Test
-    void aClassCanSayWhichKeysItsFieldsClaim() throws IOException {
+    void aClassCanSayWhichKeysItsFieldsClaim() {
         // The caller deciding what to ignore has to work in the same units the
         // fields do, and only the class knows what those are.
         assertThat(new RenamedKeyClass().declaredKeys())
@@ -117,7 +117,7 @@ class IgnoredKeyTests extends TestCommon {
     }
 
     @Test
-    void aKeyDerivedFromItsFieldNameIsInThereTheWayItIsWritten() throws IOException {
+    void aKeyDerivedFromItsFieldNameIsInThereTheWayItIsWritten() {
         assertThat(new org.avarion.yaml.testClasses.BareKeyClass().declaredKeys())
                 .containsExactly("server_name", "max_players", "debug");
     }

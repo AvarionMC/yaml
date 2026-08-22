@@ -52,7 +52,7 @@ class InheritedFieldTests extends TestCommon {
     }
 
     @Test
-    void andItIsOneOfTheKeysTheClassSaysItClaims() throws IOException {
+    void andItIsOneOfTheKeysTheClassSaysItClaims() {
         assertThat(new InheritedFieldClass.Derived().declaredKeys())
                 .containsExactlyInAnyOrder("own.timeout", "shared.debug");
     }
