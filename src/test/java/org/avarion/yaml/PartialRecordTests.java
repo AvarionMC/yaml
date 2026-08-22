@@ -1,5 +1,6 @@
 package org.avarion.yaml;
 
+import org.avarion.yaml.testClasses.PackagePrivateRecordClass;
 import org.avarion.yaml.testClasses.PartialRecordClass;
 import org.avarion.yaml.testClasses.PartialRecordClass.Engine;
 import org.junit.jupiter.api.Test;
@@ -155,5 +156,22 @@ class PartialRecordTests extends TestCommon {
                 .contains("hostname: moved-host")
                 .contains("port: 3306")
                 .contains("password: secret");
+    }
+
+    @Test
+    void aRecordThePluginKeepsToItsOwnPackageStillKeepsItsDefaults() throws IOException {
+        // The record's canonical constructor and accessors are reachable only by opening them
+        // reflectively; the fallback for an omitted component has to survive that.
+        writeYaml("""
+                credentials:
+                  hostname: from-file
+                """);
+
+        PackagePrivateRecordClass loaded = new PackagePrivateRecordClass().load(target);
+
+        assertThat(loaded.hostname()).isEqualTo("from-file");
+        assertThat(loaded.port())
+                .as("the default for the omitted component came through the opened accessor")
+                .isEqualTo(3306);
     }
 }
