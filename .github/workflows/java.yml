@@ -1,0 +1,27 @@
+name: Java
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  java:
+    uses: svaningelgem/ci-workflows/.github/workflows/java.yml@v1
+    with:
+      java-version: '17'
+      fetch-depth: 0
+      command: |
+        ./gradlew clean jar
+        for v in 1.14 1.33 2.2 2.4; do ./gradlew test -PsnakeYamlVersion=$v; done
+        ./gradlew sonar
+    secrets:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
